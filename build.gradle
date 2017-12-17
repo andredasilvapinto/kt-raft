@@ -35,6 +35,7 @@ dependencies {
 
     compile 'org.mapdb:mapdb:3.0.5'
     compile 'com.squareup.tape2:tape:2.0.0-20171208.175004-35'
+    compile 'com.natpryce:konfig:1.6.1.0'
 
     testCompile 'junit:junit:4.11'
     testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"

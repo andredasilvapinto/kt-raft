@@ -1,5 +1,9 @@
 package me.andresp
 
+import com.natpryce.konfig.ConfigurationProperties
+import com.natpryce.konfig.EnvironmentVariables
+import com.natpryce.konfig.overriding
+import me.andresp.config.config
 import me.andresp.events.CommandProcessor
 import me.andresp.models.LogDisk
 import me.andresp.models.StateInMemory
@@ -9,6 +13,12 @@ import java.io.File
 
 
 fun main(args: Array<String>) {
+    val cfg = EnvironmentVariables() overriding
+            ConfigurationProperties.fromResource("config.properties")
+
+    println(cfg.list())
+    println("${cfg[config.httpPort]}, ${cfg[config.numberNodes]}")
+
     val filePath = "./queue.tape"
 
     println("Creating new log at: $filePath")
