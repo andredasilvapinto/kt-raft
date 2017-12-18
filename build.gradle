@@ -1,6 +1,7 @@
 buildscript {
     ext.kotlin_version = '1.2.10'
     ext.serialization_version = '0.3'
+    ext.ktor_version = '0.9.0'
 
     repositories {
         mavenCentral()
@@ -20,22 +21,39 @@ apply plugin: 'application'
 
 defaultTasks 'run'
 
+sourceCompatibility = 1.8
 mainClassName = 'me.andresp.MainKt'
+
+kotlin {
+    experimental {
+        coroutines "enable"
+    }
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
 
 repositories {
     mavenCentral()
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
     maven { url "https://kotlin.bintray.com/kotlinx" }
+    maven { url "http://dl.bintray.com/kotlin/ktor" }
 }
 
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     compile "org.jetbrains.kotlinx:kotlinx-serialization-runtime:$serialization_version"
 
     compile 'org.mapdb:mapdb:3.0.5'
     compile 'com.squareup.tape2:tape:2.0.0-20171208.175004-35'
     compile 'com.natpryce:konfig:1.6.1.0'
+    compile "io.ktor:ktor-server-netty:$ktor_version"
+    compile "io.ktor:ktor-jackson:$ktor_version"
 
     testCompile 'junit:junit:4.11'
     testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
