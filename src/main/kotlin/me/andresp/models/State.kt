@@ -1,8 +1,6 @@
 package me.andresp.models
 
-interface State {
-    fun print()
-
+interface State : ReadOnlyState {
     fun set(key: String, value: String)
 
     fun del(key: String)

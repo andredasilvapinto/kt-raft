@@ -12,11 +12,9 @@ class StateInMemory : State {
         map = db.hashMap("state", Serializer.STRING, Serializer.STRING).createOrOpen()
     }
 
-    override fun print() {
-        map.forEach{
-            println("${it.key}: ${it.value}")
-        }
-    }
+    override fun printAll() = map.forEach{ println("${it.key}: ${it.value}") }
+
+    override fun get(key: String) = map[key]
 
     override fun set(key: String, value: String) {
         map.put(key, value)

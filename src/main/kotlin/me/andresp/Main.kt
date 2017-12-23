@@ -5,6 +5,7 @@ import com.natpryce.konfig.EnvironmentVariables
 import com.natpryce.konfig.overriding
 import me.andresp.config.config
 import me.andresp.events.CommandProcessor
+import me.andresp.http.startServer
 import me.andresp.models.LogDisk
 import me.andresp.models.StateInMemory
 import me.andresp.models.newDelete
@@ -25,17 +26,19 @@ fun main(args: Array<String>) {
     File(filePath).deleteRecursively()
 
     val log = LogDisk(filePath)
-    log.print()
+    log.printAll()
 
     val state = StateInMemory()
-    state.print()
+    state.printAll()
 
     val cmdProcessor = CommandProcessor(log, state)
     cmdProcessor.apply(newSet("A", "3"))
     cmdProcessor.apply(newSet("B", "5"))
     cmdProcessor.apply(newDelete("A"))
 
-    state.print()
+    state.printAll()
 
-    log.print()
+    log.printAll()
+
+    startServer(cfg[config.httpPort], cmdProcessor, state)
 }
