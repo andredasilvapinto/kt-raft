@@ -2,6 +2,7 @@ buildscript {
     ext.kotlin_version = '1.2.10'
     ext.serialization_version = '0.3'
     ext.ktor_version = '0.9.0'
+    ext.log4j_version = '2.10.0'
 
     repositories {
         mavenCentral()
@@ -54,6 +55,10 @@ dependencies {
     compile 'com.natpryce:konfig:1.6.1.0'
     compile "io.ktor:ktor-server-netty:$ktor_version"
     compile "io.ktor:ktor-jackson:$ktor_version"
+
+    compile "org.apache.logging.log4j:log4j-api:$log4j_version"
+    compile "org.apache.logging.log4j:log4j-core:$log4j_version"
+    compile "org.apache.logging.log4j:log4j-slf4j-impl:$log4j_version"
 
     testCompile 'junit:junit:4.11'
     testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"

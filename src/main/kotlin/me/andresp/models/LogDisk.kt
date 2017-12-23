@@ -19,7 +19,7 @@ class LogDisk(filePath: String) : Log {
         queue.add(cmd)
     }
 
-    override fun print() {
+    override fun printAll() {
         queue.asList().forEach { println(it) }
     }
 
