@@ -2,7 +2,9 @@ package me.andresp.models
 
 interface Log {
 
-    fun printAll()
+    override fun toString(): String
+
+    fun log()
 
     fun commands(): List<Command>
 

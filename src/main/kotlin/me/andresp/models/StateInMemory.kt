@@ -3,6 +3,7 @@ package me.andresp.models
 import org.mapdb.DBMaker
 import org.mapdb.HTreeMap
 import org.mapdb.Serializer
+import org.slf4j.LoggerFactory
 
 class StateInMemory : State {
     private val map: HTreeMap<String, String>
@@ -12,7 +13,9 @@ class StateInMemory : State {
         map = db.hashMap("state", Serializer.STRING, Serializer.STRING).createOrOpen()
     }
 
-    override fun printAll() = map.forEach{ println("${it.key}: ${it.value}") }
+    override fun toString() = map.asIterable().joinToString { "${it.key}: ${it.value}" }
+
+    override fun log() = logger.info("Current state: $this")
 
     override fun get(key: String) = map[key]
 
@@ -22,6 +25,10 @@ class StateInMemory : State {
 
     override fun del(key: String) {
         map.remove(key)
+    }
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(this::class.java)
     }
 }
 

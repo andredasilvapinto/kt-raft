@@ -1,8 +1,9 @@
 package me.andresp
 
+import com.natpryce.konfig.CommandLineOption
 import com.natpryce.konfig.ConfigurationProperties
-import com.natpryce.konfig.EnvironmentVariables
 import com.natpryce.konfig.overriding
+import com.natpryce.konfig.parseArgs
 import me.andresp.config.config
 import me.andresp.events.CommandProcessor
 import me.andresp.http.startServer
@@ -10,35 +11,37 @@ import me.andresp.models.LogDisk
 import me.andresp.models.StateInMemory
 import me.andresp.models.newDelete
 import me.andresp.models.newSet
+import org.slf4j.LoggerFactory
 import java.io.File
 
 
 fun main(args: Array<String>) {
-    val cfg = EnvironmentVariables() overriding
+    val logger = LoggerFactory.getLogger("main")
+
+    val (cfg, _) = parseArgs(args, CommandLineOption(config.target, "target", "t", "address to connect to", "IP:PORT")) overriding
             ConfigurationProperties.fromResource("config.properties")
+    logger.info(cfg.list().toString())
 
-    println(cfg.list())
-    println("${cfg[config.httpPort]}, ${cfg[config.numberNodes]}")
+    val httpPort = cfg[config.httpPort]
+    val numberOfNodes = cfg[config.numberNodes]
+    val target = cfg.getOrNull(config.target)
+    val logPath = cfg[config.logPath]
 
-    val filePath = "./queue.tape"
+    logger.info("$httpPort, $numberOfNodes, $logPath, $target")
 
-    println("Creating new log at: $filePath")
-    File(filePath).deleteRecursively()
+    logger.info("Creating new log at: $logPath")
+    File(logPath).deleteRecursively()
 
-    val log = LogDisk(filePath)
-    log.printAll()
-
+    val log = LogDisk(logPath)
     val state = StateInMemory()
-    state.printAll()
 
     val cmdProcessor = CommandProcessor(log, state)
     cmdProcessor.apply(newSet("A", "3"))
     cmdProcessor.apply(newSet("B", "5"))
     cmdProcessor.apply(newDelete("A"))
 
-    state.printAll()
+    state.log()
+    log.log()
 
-    log.printAll()
-
-    startServer(cfg[config.httpPort], cmdProcessor, state)
+    startServer(httpPort, cmdProcessor, state)
 }

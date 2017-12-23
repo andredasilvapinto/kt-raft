@@ -3,11 +3,13 @@ package me.andresp.models
 import com.squareup.tape2.ObjectQueue
 import com.squareup.tape2.QueueFile
 import kotlinx.serialization.cbor.CBOR
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 
 class LogDisk(filePath: String) : Log {
+
     private val queue: ObjectQueue<Command>
 
     init {
@@ -19,9 +21,9 @@ class LogDisk(filePath: String) : Log {
         queue.add(cmd)
     }
 
-    override fun printAll() {
-        queue.asList().forEach { println(it) }
-    }
+    override fun toString() = queue.asList().fold("", { acc, cmd -> "$acc $cmd" })
+
+    override fun log() = logger.info("Current log: $this")
 
     override fun commands(): List<Command> {
         return queue.asList()
@@ -37,5 +39,9 @@ class LogDisk(filePath: String) : Log {
         override fun toStream(cmd: Command, os: OutputStream) {
             os.write(CBOR.Companion.dump(cmd))
         }
+    }
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(this::class.java)
     }
 }

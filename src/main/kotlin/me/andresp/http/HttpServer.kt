@@ -49,13 +49,13 @@ fun startServer(httpPort: Int, cmdProcessor: CommandProcessor, state: ReadOnlySt
                 val key = call.parameters["key"]!!
                 val itemValue = call.receive<ItemValue>()
                 cmdProcessor.apply(newSet(key, itemValue.value))
-                state.printAll()
+                state.log()
                 call.respond(HttpStatusCode.OK)
             }
             delete("/data/{key}") {
                 val key = call.parameters["key"]!!
                 cmdProcessor.apply(newDelete(key))
-                state.printAll()
+                state.log()
                 call.respond(HttpStatusCode.OK)
             }
         }
