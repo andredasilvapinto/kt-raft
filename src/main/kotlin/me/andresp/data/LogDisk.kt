@@ -1,4 +1,4 @@
-package me.andresp.models
+package me.andresp.data
 
 import com.squareup.tape2.ObjectQueue
 import com.squareup.tape2.QueueFile

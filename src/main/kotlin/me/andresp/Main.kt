@@ -7,10 +7,10 @@ import com.natpryce.konfig.parseArgs
 import me.andresp.config.config
 import me.andresp.events.CommandProcessor
 import me.andresp.http.startServer
-import me.andresp.models.LogDisk
-import me.andresp.models.StateInMemory
-import me.andresp.models.newDelete
-import me.andresp.models.newSet
+import me.andresp.data.LogDisk
+import me.andresp.data.InMemoryConsolidatedState
+import me.andresp.data.newDelete
+import me.andresp.data.newSet
 import org.slf4j.LoggerFactory
 import java.io.File
 
@@ -33,7 +33,7 @@ fun main(args: Array<String>) {
     File(logPath).deleteRecursively()
 
     val log = LogDisk(logPath)
-    val state = StateInMemory()
+    val state = InMemoryConsolidatedState()
 
     val cmdProcessor = CommandProcessor(log, state)
     cmdProcessor.apply(newSet("A", "3"))

@@ -1,14 +1,14 @@
 package me.andresp.events
 
-import me.andresp.models.*
+import me.andresp.data.*
 
-class CommandProcessor(private val log: Log, private val state: State) {
+class CommandProcessor(private val log: Log, private val consolidatedState: ConsolidatedState) {
     fun apply(cmd: Command) {
         log.append(cmd)
 
         when (cmd.type) {
-            CommandType.SET -> state.set(cmd.key, cmd.value!!)
-            CommandType.DELETE -> state.del(cmd.key)
+            CommandType.SET -> consolidatedState.set(cmd.key, cmd.value!!)
+            CommandType.DELETE -> consolidatedState.del(cmd.key)
         }
     }
 

@@ -1,6 +1,6 @@
-package me.andresp.models
+package me.andresp.data
 
-interface ReadOnlyState {
+interface ConsolidatedReadOnlyState {
     override fun toString(): String
 
     fun log()

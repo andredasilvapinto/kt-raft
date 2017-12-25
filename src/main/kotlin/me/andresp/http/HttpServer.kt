@@ -18,14 +18,14 @@ import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import me.andresp.events.CommandProcessor
-import me.andresp.models.ReadOnlyState
-import me.andresp.models.newDelete
-import me.andresp.models.newSet
+import me.andresp.data.ConsolidatedReadOnlyState
+import me.andresp.data.newDelete
+import me.andresp.data.newSet
 
 data class Item(val key: String, val value: String)
 data class ItemValue(val value: String)
 
-fun startServer(httpPort: Int, cmdProcessor: CommandProcessor, state: ReadOnlyState) {
+fun startServer(httpPort: Int, cmdProcessor: CommandProcessor, stateConsolidated: ConsolidatedReadOnlyState) {
     embeddedServer(Netty, httpPort) {
         install(DefaultHeaders)
         install(Compression)
@@ -38,7 +38,7 @@ fun startServer(httpPort: Int, cmdProcessor: CommandProcessor, state: ReadOnlySt
         routing {
             get("/data/{key}") {
                 val key = call.parameters["key"]!!
-                val value = state.get(key)
+                val value = stateConsolidated.get(key)
                 if (value == null) {
                     call.respond(HttpStatusCode.NotFound)
                 } else {
@@ -49,13 +49,13 @@ fun startServer(httpPort: Int, cmdProcessor: CommandProcessor, state: ReadOnlySt
                 val key = call.parameters["key"]!!
                 val itemValue = call.receive<ItemValue>()
                 cmdProcessor.apply(newSet(key, itemValue.value))
-                state.log()
+                stateConsolidated.log()
                 call.respond(HttpStatusCode.OK)
             }
             delete("/data/{key}") {
                 val key = call.parameters["key"]!!
                 cmdProcessor.apply(newDelete(key))
-                state.log()
+                stateConsolidated.log()
                 call.respond(HttpStatusCode.OK)
             }
         }

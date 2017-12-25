@@ -1,4 +1,4 @@
-package me.andresp.models
+package me.andresp.data
 
 interface Log {
 

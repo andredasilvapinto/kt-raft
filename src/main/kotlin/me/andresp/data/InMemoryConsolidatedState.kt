@@ -1,11 +1,11 @@
-package me.andresp.models
+package me.andresp.data
 
 import org.mapdb.DBMaker
 import org.mapdb.HTreeMap
 import org.mapdb.Serializer
 import org.slf4j.LoggerFactory
 
-class StateInMemory : State {
+class InMemoryConsolidatedState : ConsolidatedState {
     private val map: HTreeMap<String, String>
 
     init {
