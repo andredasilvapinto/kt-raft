@@ -17,7 +17,7 @@ import io.ktor.routing.post
 import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import me.andresp.events.CommandProcessor
+import me.andresp.data.CommandProcessor
 import me.andresp.data.ConsolidatedReadOnlyState
 import me.andresp.data.newDelete
 import me.andresp.data.newSet

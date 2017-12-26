@@ -5,19 +5,16 @@ import com.natpryce.konfig.ConfigurationProperties
 import com.natpryce.konfig.overriding
 import com.natpryce.konfig.parseArgs
 import me.andresp.config.config
-import me.andresp.events.CommandProcessor
+import me.andresp.data.*
 import me.andresp.http.startServer
-import me.andresp.data.LogDisk
-import me.andresp.data.InMemoryConsolidatedState
-import me.andresp.data.newDelete
-import me.andresp.data.newSet
+import me.andresp.statemachine.StateMachine
 import org.slf4j.LoggerFactory
 import java.io.File
 
 
-fun main(args: Array<String>) {
-    val logger = LoggerFactory.getLogger("main")
+val logger = LoggerFactory.getLogger("main")!!
 
+fun main(args: Array<String>) {
     val (cfg, _) = parseArgs(args, CommandLineOption(config.target, "target", "t", "address to connect to", "IP:PORT")) overriding
             ConfigurationProperties.fromResource("config.properties")
     logger.info(cfg.list().toString())
@@ -43,5 +40,6 @@ fun main(args: Array<String>) {
     state.log()
     log.log()
 
+    StateMachine.construct(cfg).start()
     startServer(httpPort, cmdProcessor, state)
 }

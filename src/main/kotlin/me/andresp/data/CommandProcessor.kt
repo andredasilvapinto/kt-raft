@@ -1,6 +1,4 @@
-package me.andresp.events
-
-import me.andresp.data.*
+package me.andresp.data
 
 class CommandProcessor(private val log: Log, private val consolidatedState: ConsolidatedState) {
     fun apply(cmd: Command) {
