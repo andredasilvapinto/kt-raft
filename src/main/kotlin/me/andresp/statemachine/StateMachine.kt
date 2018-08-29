@@ -1,14 +1,22 @@
 package me.andresp.statemachine
 
 import com.natpryce.konfig.Configuration
+import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.runBlocking
+import me.andresp.cluster.Cluster
+import me.andresp.cluster.Node
+import me.andresp.cluster.NodeAddress
 import me.andresp.config.config
+import me.andresp.http.LOCAL_IP
+import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.*
 import kotlin.concurrent.schedule
 
-class StateMachine(private val node: Node, private val states: Map<StateId, State>, initialState: State) {
+
+class StateMachine(val node: Node, private val nodeClient: NodeClient, private val states: Map<StateId, AState>, initialState: AState) {
     var currentState = initialState
         private set
 
@@ -19,36 +27,50 @@ class StateMachine(private val node: Node, private val states: Map<StateId, Stat
         val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
         val ELECTION_TIMEOUT_RANGE_MS = 150..300
 
-        fun construct(cfg: Configuration): StateMachine {
-            val node = Node(cfg[config.numberNodes])
+        fun construct(cfg: Configuration, nodeClient: NodeClient): StateMachine {
+            val cluster = Cluster(cfg[config.numberNodes])
+            val node = Node(NodeAddress(LOCAL_IP, cfg[config.httpPort]), cluster)
             val states = mapOf(
-                    FOLLOWER to FollowerState(node),
-                    CANDIDATE to CandidateState(node),
-                    LEADER to LeaderState(node)
+                    FOLLOWER to FollowerState(node, nodeClient),
+                    CANDIDATE to CandidateState(node, nodeClient),
+                    LEADER to LeaderState(node, nodeClient)
             )
-            return StateMachine(node, states, states[FOLLOWER]!!)
+            return StateMachine(node, nodeClient, states, states[FOLLOWER]!!)
         }
     }
 
-    fun start() {
+    fun start(target: NodeAddress?) {
+        if (target != null) {
+            runBlocking {
+                logger.info("Joining cluster via $target")
+                nodeClient.join(target, node.nodeAddress)
+            }
+        }
         scheduleTimeout()
     }
 
     private fun scheduleTimeout() {
         timerTask?.cancel()
+        // TODO: Kotlin Compiler Bug
         timerTask = timer.schedule(ELECTION_TIMEOUT_RANGE_MS.random().toLong(), {
-            logger.info("Timeout reached. Injecting timeout event.")
-            handle(LeaderHeartbeatTimeout(node.currentElectionTerm))
+            logger.info("Leader timeout reached. Injecting timeout event.")
+            launch {
+                handle(LeaderHeartbeatTimeout(node.cluster.currentElectionTerm))
+            }
         })
     }
 
-    fun handle(e: Event) {
-        val newStateId = currentState.handle(e)
-        val newState = states[newStateId]!!
-        if (newState != currentState) {
-            logger.info("STATE CHANGE: ${currentState.id} -> ${newState.id}")
-            currentState = newState
-            currentState.enter()
+    suspend fun handle(ev: Event) {
+        try {
+            val newStateId = currentState.handle(ev)
+            val newState = states[newStateId]!!
+            if (newState != currentState) {
+                logger.info("STATE CHANGE: ${currentState.id} -> ${newState.id}")
+                currentState = newState
+                currentState.enter()
+            }
+        } catch (e: Exception) {
+            logger.error("Error handling $ev", e)
         }
     }
 }

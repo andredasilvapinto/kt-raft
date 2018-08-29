@@ -1,11 +1,13 @@
 package me.andresp.statemachine
 
+import me.andresp.cluster.Node
+import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.CANDIDATE
 import me.andresp.statemachine.StateId.LEADER
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class CandidateState(private val node: Node) : State(CANDIDATE) {
+class CandidateState(private val node: Node, client: NodeClient) : AState(CANDIDATE, client) {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(CandidateState::class.java)
@@ -17,10 +19,11 @@ class CandidateState(private val node: Node) : State(CANDIDATE) {
         logger.info("Should ask for votes")
     }
 
-    override fun <T : Event> handle(e: T): StateId {
+    override suspend fun <T : Event> handle(e: T): StateId {
         return when (e) {
-            is LeaderHeartbeat -> handleLeaderHeartBeat(e, node)
+            is LeaderHeartbeat -> handleLeaderHeartBeat(e, node.cluster)
             is VoteReceived -> handleVoteReceived(e)
+            is NodeJoined -> handleNodeJoined(e, node.cluster)
             else -> {
                 logger.info("Candidate doesn't handle ${e.javaClass}. Ignoring.")
                 CANDIDATE
@@ -29,9 +32,9 @@ class CandidateState(private val node: Node) : State(CANDIDATE) {
     }
 
     private fun handleVoteReceived(e: VoteReceived): StateId {
-        return if (receivedVotes++ > node.totalNumberOfNodes / 2) {
+        return if (receivedVotes++ > node.cluster.totalNumberOfNodes / 2) {
             // TODO: Consider moving to Leader enter actions?
-            node.updateLeader(node.nodeId, node.currentElectionTerm)
+            node.cluster.updateLeader(node.nodeAddress, node.cluster.currentElectionTerm)
             LEADER
         } else {
             CANDIDATE

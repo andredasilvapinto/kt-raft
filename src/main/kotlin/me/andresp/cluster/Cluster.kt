@@ -1,17 +1,14 @@
-package me.andresp.statemachine
+package me.andresp.cluster
 
-
-class Node(val totalNumberOfNodes: Int) {
-    // TODO: Generate (consider using uris / ip:port)
-    val nodeId = "something-1"
-    var leader = ""
+class Cluster(val totalNumberOfNodes: Int) {
+    var leader: NodeAddress? = null
         private set
     // needs to be persisted to disk
     var currentElectionTerm = 1
         private set
-    val otherNodes = mutableSetOf<NodeAddress>()
+    val nodeAddresses = mutableSetOf<NodeAddress>()
 
-    fun updateLeader(newLeader: String, newLeaderElectionTerm: Int) {
+    fun updateLeader(newLeader: NodeAddress, newLeaderElectionTerm: Int) {
         synchronized(this, {
             // TODO Improve + persist
             if (newLeaderElectionTerm < currentElectionTerm) {
@@ -22,6 +19,10 @@ class Node(val totalNumberOfNodes: Int) {
             }
         })
     }
+
+    fun addNode(newNode: NodeAddress) = nodeAddresses.add(newNode)
+
+    fun getStatus() = ClusterStatus(nodeAddresses)
 }
 
-data class NodeAddress(val host: String, val port: Int)
+data class ClusterStatus(val nodes: Set<NodeAddress>)

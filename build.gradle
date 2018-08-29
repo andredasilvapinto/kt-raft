@@ -1,7 +1,7 @@
 buildscript {
-    ext.kotlin_version = '1.2.10'
-    ext.serialization_version = '0.3'
-    ext.ktor_version = '0.9.0'
+    ext.kotlin_version = '1.2.61'
+    ext.serialization_version = '0.6.1'
+    ext.ktor_version = '0.9.3'
     ext.log4j_version = '2.10.0'
 
     repositories {
@@ -46,7 +46,7 @@ repositories {
 }
 
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     compile "org.jetbrains.kotlinx:kotlinx-serialization-runtime:$serialization_version"
 
@@ -54,6 +54,8 @@ dependencies {
     compile 'com.squareup.tape2:tape:2.0.0-20171208.175004-35'
     compile 'com.natpryce:konfig:1.6.1.0'
     compile "io.ktor:ktor-server-netty:$ktor_version"
+    compile "io.ktor:ktor-client-apache:$ktor_version"
+    compile "io.ktor:ktor-client-json:$ktor_version"
     compile "io.ktor:ktor-jackson:$ktor_version"
 
     compile "org.apache.logging.log4j:log4j-api:$log4j_version"
