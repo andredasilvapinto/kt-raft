@@ -45,6 +45,8 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
                 logger.info("Joining cluster via $target")
                 nodeClient.join(target, node.nodeAddress)
             }
+        } else {
+            node.cluster.addNode(node.nodeAddress)
         }
         scheduleTimeout()
     }

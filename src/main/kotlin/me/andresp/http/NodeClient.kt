@@ -16,7 +16,7 @@ val logger = LoggerFactory.getLogger("NodeClient")!!
 class NodeClient(private val httpClient: HttpClient) {
 
     suspend fun join(targetAddress: NodeAddress, joinerAddress: NodeAddress) {
-        val clusterStatus = httpClient.request<String> {
+        val clusterStatus = httpClient.request<ClusterStatus> {
             url {
                 host = targetAddress.host
                 port = targetAddress.port
