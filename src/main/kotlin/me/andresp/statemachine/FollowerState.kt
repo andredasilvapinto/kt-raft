@@ -15,13 +15,13 @@ class FollowerState(node: Node, client: NodeClient) : AState(FOLLOWER, node, cli
 
     override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
         return when (e) {
-            is LeaderHeartbeat -> handleLeaderHeartBeat(e)
+            is LeaderHeartbeat -> handleLeaderHeartBeat(e, stateMachine)
             is LeaderHeartbeatTimeout -> CANDIDATE
             is VoteRequested -> handleVoteRequested(e)
             is NodeJoined -> handleNodeJoined(e)
             else -> {
                 logger.info("FollowerState doesn't handle ${e.javaClass}. Ignoring.")
-                CANDIDATE
+                FOLLOWER
             }
         }
     }

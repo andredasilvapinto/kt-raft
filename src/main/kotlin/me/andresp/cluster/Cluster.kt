@@ -7,14 +7,13 @@ class Cluster(val totalNumberOfNodes: Int) {
     var nodeAddresses = mutableSetOf<NodeAddress>()
         private set
 
+    @Synchronized
     fun updateLeader(newLeader: NodeAddress, newLeaderElectionTerm: Int, currentElectionTerm: Int) {
-        synchronized(this) {
-            // TODO Improve + persist
-            if (newLeaderElectionTerm < currentElectionTerm) {
-                throw IllegalArgumentException("Trying to set older leader $newLeader from term $newLeaderElectionTerm when we already have $leader from term $currentElectionTerm")
-            } else {
-                this.leader = leader
-            }
+        // TODO Improve + persist
+        if (newLeaderElectionTerm < currentElectionTerm) {
+            throw IllegalArgumentException("Trying to set older leader $newLeader from term $newLeaderElectionTerm when we already have $leader from term $currentElectionTerm")
+        } else {
+            this.leader = newLeader
         }
     }
 

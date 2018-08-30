@@ -1,5 +1,7 @@
 package me.andresp.cluster
 
+import me.andresp.statemachine.LeaderHeartbeat
+
 
 // TODO Strange that cluster is inside Cluster ?
 class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
@@ -11,6 +13,12 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
 
     fun newTerm() {
         currentElectionTerm = Term(currentElectionTerm.number + 1, null)
+    }
+
+    @Synchronized
+    fun handleNewLeader(newLeaderHeartbeat: LeaderHeartbeat) {
+        cluster.updateLeader(newLeaderHeartbeat.leaderAddress, newLeaderHeartbeat.electionTerm, currentElectionTerm.number)
+        currentElectionTerm = Term(newLeaderHeartbeat.electionTerm, null)
     }
 }
 

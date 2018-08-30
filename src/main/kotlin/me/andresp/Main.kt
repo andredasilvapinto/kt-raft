@@ -10,6 +10,7 @@ import io.ktor.client.features.json.JsonFeature
 import me.andresp.cluster.NodeAddress
 import me.andresp.config.config
 import me.andresp.data.*
+import me.andresp.http.LOCAL_IP
 import me.andresp.http.NodeClient
 import me.andresp.http.startServer
 import me.andresp.statemachine.StateMachine
@@ -50,8 +51,10 @@ fun main(args: Array<String>) {
     state.log()
     log.log()
 
-    val nodeClient = NodeClient(HttpClient(Apache) { install(JsonFeature)})
-    val stateMachine = StateMachine.construct(cfg, nodeClient)
+    val selfAddress = NodeAddress(LOCAL_IP, cfg[config.httpPort])
+    val nodeClient = NodeClient(selfAddress, HttpClient(Apache) { install(JsonFeature)})
+    val stateMachine = StateMachine.construct(cfg, nodeClient, selfAddress)
+    val server = startServer(httpPort, stateMachine, cmdProcessor, state)
+    server.start(wait = false)
     stateMachine.start(target)
-    startServer(httpPort, stateMachine, cmdProcessor, state)
 }

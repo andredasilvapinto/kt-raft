@@ -7,7 +7,6 @@ import me.andresp.cluster.Cluster
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
 import me.andresp.config.config
-import me.andresp.http.LOCAL_IP
 import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.*
 import org.slf4j.Logger
@@ -25,11 +24,12 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
-        val ELECTION_TIMEOUT_RANGE_MS = 150..300
+        val ELECTION_TIMEOUT_RANGE_MS = 1500..3000 //150..300
+        const val INITIAL_TIMEOUT_DELAY_MS = 5000L
 
-        fun construct(cfg: Configuration, nodeClient: NodeClient): StateMachine {
+        fun construct(cfg: Configuration, nodeClient: NodeClient, selfAddress: NodeAddress): StateMachine {
             val cluster = Cluster(cfg[config.numberNodes])
-            val node = Node(NodeAddress(LOCAL_IP, cfg[config.httpPort]), cluster)
+            val node = Node(selfAddress, cluster)
             val states = mapOf(
                     FOLLOWER to FollowerState(node, nodeClient),
                     CANDIDATE to CandidateState(node, nodeClient),
@@ -51,17 +51,23 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
 
             }
         }
-        scheduleTimeout()
+        scheduleLeaderTimeout(INITIAL_TIMEOUT_DELAY_MS)
     }
 
-    private fun scheduleTimeout() {
+    fun scheduleLeaderTimeout(extraDelayMs: Long = 0L) {
         timerTask?.cancel()
-        timerTask = timer.schedule(ELECTION_TIMEOUT_RANGE_MS.random().toLong()) {
-            logger.info("Leader timeout reached. Injecting timeout event.")
+        val delayMs = extraDelayMs + ELECTION_TIMEOUT_RANGE_MS.random().toLong()
+        timerTask = timer.schedule(delayMs) {
+            logger.info("Leader timeout $delayMs ms reached. Injecting timeout event.")
             launch {
                 handle(LeaderHeartbeatTimeout(node.currentElectionTerm.number))
             }
         }
+    }
+
+    fun cancelLeaderTimeout() {
+        logger.info("Cancelling leader timeout")
+        timerTask?.cancel()
     }
 
     // Only one event at a time, only one current state at a time

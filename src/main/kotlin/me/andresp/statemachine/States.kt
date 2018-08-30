@@ -9,18 +9,23 @@ abstract class AState(val id: StateId, protected val node: Node, protected val c
 
     abstract fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId
 
-    protected fun handleLeaderHeartBeat(e: LeaderHeartbeat): StateId =
+    protected fun handleLeaderHeartBeat(e: LeaderHeartbeat, stateMachine: StateMachine): StateId =
             if (e.electionTerm > node.currentElectionTerm.number) {
-                node.cluster.updateLeader(e.leaderAddress, e.electionTerm, node.currentElectionTerm.number)
+                node.handleNewLeader(e)
+                stateMachine.scheduleLeaderTimeout()
                 StateId.FOLLOWER
             } else {
+                if (e.leaderAddress == node.cluster.leader) {
+                    // reset timeout :: TODO what if it is in candidate state?
+                    stateMachine.scheduleLeaderTimeout()
+                }
                 id
             }
 
     protected fun handleNodeJoined(e: NodeJoined): StateId {
         node.cluster.addNode(e.joinerAddress)
         // TODO send only to old nodes?? or not send at all and wait till time out?
-        //cluster.nodeAddresses.map { client.sendClusterStatus(it, cluster.getStatus()) }
+        //cluster.nodeAddresses.map { client.sendHeartbeat(it, cluster.getStatus()) }
         return id
     }
 

@@ -12,17 +12,17 @@ import io.ktor.jackson.jackson
 import io.ktor.request.receive
 import io.ktor.response.respond
 import io.ktor.routing.*
+import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.experimental.runBlocking
 import me.andresp.api.AskVotePayload
-import me.andresp.cluster.ClusterStatus
 import me.andresp.cluster.NodeAddress
 import me.andresp.data.CommandProcessor
 import me.andresp.data.ConsolidatedReadOnlyState
 import me.andresp.data.newDelete
 import me.andresp.data.newSet
-import me.andresp.statemachine.ClusterUpdated
+import me.andresp.statemachine.LeaderHeartbeat
 import me.andresp.statemachine.NodeJoined
 import me.andresp.statemachine.StateMachine
 import me.andresp.statemachine.VoteRequested
@@ -30,8 +30,8 @@ import me.andresp.statemachine.VoteRequested
 data class Item(val key: String, val value: String)
 data class ItemValue(val value: String)
 
-fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: CommandProcessor, stateConsolidated: ConsolidatedReadOnlyState) {
-    embeddedServer(Netty, httpPort) {
+fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: CommandProcessor, stateConsolidated: ConsolidatedReadOnlyState): ApplicationEngine {
+    return embeddedServer(Netty, httpPort) {
         val logger = environment.log
         install(DefaultHeaders)
         install(Compression)
@@ -68,16 +68,15 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
             }
 //            post("/cluster/vote/{term}") {
 //                val electionTerm: Int = call.parameters["term"]!!.toInt()
-//                val voterAddress = call.receive<NodeAddress>()
-//                logger.info("Received vote from $voterAddress")
-//                val voteReceived = VoteReceived(electionTerm, voterAddress)
+//                val leaderAddress = call.receive<NodeAddress>()
+//                logger.info("Received vote from $leaderAddress")
+//                val voteReceived = VoteReceived(electionTerm, leaderAddress)
 //                stateMachine.handle(voteReceived)
 //            }
-            put("/cluster/update") {
-                val clusterStatus = call.receive<ClusterStatus>()
-                logger.info("Received cluster status $clusterStatus")
-                val clusterUpdated = ClusterUpdated(clusterStatus)
-                stateMachine.handle(clusterUpdated)
+            put("/cluster/heartbeat") {
+                val leaderHeartbeat = call.receive<LeaderHeartbeat>()
+                logger.info("Received heartbeat $leaderHeartbeat")
+                stateMachine.handle(leaderHeartbeat)
             }
             post("/data/{key}") {
                 val key = call.parameters["key"]!!
@@ -93,5 +92,5 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 call.respond(HttpStatusCode.OK)
             }
         }
-    }.start(wait = true)
+    }
 }

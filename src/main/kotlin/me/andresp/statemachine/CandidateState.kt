@@ -1,6 +1,5 @@
 package me.andresp.statemachine
 
-import kotlinx.coroutines.experimental.launch
 import me.andresp.cluster.Node
 import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.CANDIDATE
@@ -22,7 +21,7 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
 
     override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
         return when (e) {
-            is LeaderHeartbeat -> handleLeaderHeartBeat(e)
+            is LeaderHeartbeat -> handleLeaderHeartBeat(e, stateMachine)
             is VoteReceived -> handleVoteReceived(e)
             is NodeJoined -> handleNodeJoined(e)
             is VoteRequested -> handleVoteRequested(e)
@@ -40,13 +39,11 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
         // Vote for itself
         stateMachine.handle(VoteReceived(node.currentElectionTerm.number, node.nodeAddress))
 
-        node.cluster.nodeAddresses.minus(node.nodeAddress).map {
-            launch {
-                logger.info("Asking $it for a vote")
-                val reply = client.askForVote(it, node.nodeAddress, node.currentElectionTerm.number)
-                if (reply.voteGranted) {
-                    stateMachine.handle(VoteReceived(node.currentElectionTerm.number, reply.voterAddress))
-                }
+        client.broadcast(node.cluster) {
+            logger.info("Asking $it for a vote")
+            val reply = client.askForVote(it, node.nodeAddress, node.currentElectionTerm.number)
+            if (reply.voteGranted) {
+                stateMachine.handle(VoteReceived(node.currentElectionTerm.number, reply.voterAddress))
             }
         }
     }
