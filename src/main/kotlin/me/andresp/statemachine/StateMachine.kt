@@ -40,39 +40,47 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
     }
 
     fun start(target: NodeAddress?) {
-        if (target != null) {
+        if (target == null) {
+            logger.info("Starting a new cluster")
+            node.cluster.addNode(node.nodeAddress)
+        } else {
             runBlocking {
                 logger.info("Joining cluster via $target")
-                nodeClient.join(target, node.nodeAddress)
+                val clusterStatus = nodeClient.join(target, node.nodeAddress)
+                node.cluster.setStatus(clusterStatus)
+
             }
-        } else {
-            node.cluster.addNode(node.nodeAddress)
         }
         scheduleTimeout()
     }
 
     private fun scheduleTimeout() {
         timerTask?.cancel()
-        // TODO: Kotlin Compiler Bug
-        timerTask = timer.schedule(ELECTION_TIMEOUT_RANGE_MS.random().toLong(), {
+        timerTask = timer.schedule(ELECTION_TIMEOUT_RANGE_MS.random().toLong()) {
             logger.info("Leader timeout reached. Injecting timeout event.")
             launch {
-                handle(LeaderHeartbeatTimeout(node.cluster.currentElectionTerm))
+                handle(LeaderHeartbeatTimeout(node.currentElectionTerm.number))
             }
-        })
+        }
     }
 
-    suspend fun handle(ev: Event) {
+    // Only one event at a time, only one current state at a time
+    @Synchronized
+    fun handle(ev: Event) {
         try {
-            val newStateId = currentState.handle(ev)
-            val newState = states[newStateId]!!
-            if (newState != currentState) {
-                logger.info("STATE CHANGE: ${currentState.id} -> ${newState.id}")
-                currentState = newState
-                currentState.enter()
-            }
+            val newStateId = currentState.handle(ev, this)
+            transitionState(newStateId)
         } catch (e: Exception) {
             logger.error("Error handling $ev", e)
+        }
+    }
+
+    private fun transitionState(newStateId: StateId) {
+        val newState = states[newStateId]!!
+        if (newState != currentState) {
+            logger.info("STATE CHANGE: ${currentState.id} -> ${newState.id}")
+            currentState = newState
+            currentState.enter(this)
         }
     }
 }

@@ -7,27 +7,22 @@ import me.andresp.statemachine.StateId.FOLLOWER
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class FollowerState(private val node: Node, client: NodeClient) : AState(FOLLOWER, client) {
+class FollowerState(node: Node, client: NodeClient) : AState(FOLLOWER, node, client) {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(FollowerState::class.java)
     }
 
-    override suspend fun <T : Event> handle(e: T): StateId {
+    override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
         return when (e) {
-            is LeaderHeartbeat -> handleLeaderHeartBeat(e, node.cluster)
+            is LeaderHeartbeat -> handleLeaderHeartBeat(e)
             is LeaderHeartbeatTimeout -> CANDIDATE
             is VoteRequested -> handleVoteRequested(e)
-            is NodeJoined -> handleNodeJoined(e, node.cluster)
+            is NodeJoined -> handleNodeJoined(e)
             else -> {
                 logger.info("FollowerState doesn't handle ${e.javaClass}. Ignoring.")
                 CANDIDATE
             }
         }
-    }
-
-    private suspend fun handleVoteRequested(e: VoteRequested): StateId {
-        client.voteFor(node.nodeAddress, e.candidateAddress, e.electionTerm)
-        return FOLLOWER
     }
 }

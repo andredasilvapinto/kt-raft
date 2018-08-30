@@ -14,6 +14,8 @@ import io.ktor.response.respond
 import io.ktor.routing.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import kotlinx.coroutines.experimental.runBlocking
+import me.andresp.api.AskVotePayload
 import me.andresp.cluster.ClusterStatus
 import me.andresp.cluster.NodeAddress
 import me.andresp.data.CommandProcessor
@@ -23,7 +25,7 @@ import me.andresp.data.newSet
 import me.andresp.statemachine.ClusterUpdated
 import me.andresp.statemachine.NodeJoined
 import me.andresp.statemachine.StateMachine
-import me.andresp.statemachine.VoteReceived
+import me.andresp.statemachine.VoteRequested
 
 data class Item(val key: String, val value: String)
 data class ItemValue(val value: String)
@@ -56,13 +58,21 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 stateMachine.handle(nodeJoined)
                 call.respond(HttpStatusCode.OK, stateMachine.node.cluster.getStatus())
             }
-            post("/cluster/vote/{term}") {
-                val electionTerm: Int = call.parameters["term"]!!.toInt()
-                val voterAddress = call.receive<NodeAddress>()
-                logger.info("Received vote from $voterAddress")
-                val voteReceived = VoteReceived(electionTerm, voterAddress)
-                stateMachine.handle(voteReceived)
+            put("/cluster/ask-vote/{term}") { _ ->
+                val askVotePayload = call.receive<AskVotePayload>()
+                logger.info("Received vote request $askVotePayload")
+                val voteRequested = VoteRequested(askVotePayload) {
+                    runBlocking { call.respond(HttpStatusCode.OK, it) }
+                }
+                stateMachine.handle(voteRequested)
             }
+//            post("/cluster/vote/{term}") {
+//                val electionTerm: Int = call.parameters["term"]!!.toInt()
+//                val voterAddress = call.receive<NodeAddress>()
+//                logger.info("Received vote from $voterAddress")
+//                val voteReceived = VoteReceived(electionTerm, voterAddress)
+//                stateMachine.handle(voteReceived)
+//            }
             put("/cluster/update") {
                 val clusterStatus = call.receive<ClusterStatus>()
                 logger.info("Received cluster status $clusterStatus")
