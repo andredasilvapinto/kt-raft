@@ -1,6 +1,8 @@
 package me.andresp.statemachine
 
+import kotlinx.coroutines.experimental.delay
 import me.andresp.cluster.Node
+import me.andresp.cluster.NodeAddress
 import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.CANDIDATE
 import me.andresp.statemachine.StateId.LEADER
@@ -11,11 +13,18 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(CandidateState::class.java)
+        const val VOTE_REQUEST_TIMEOUT_MS = 500
     }
 
-    private var receivedVotes = 0
+    private val receivedVotes = mutableSetOf<NodeAddress>()
+
+    @Volatile
+    private var candidacyTerm: Int = 0
 
     override fun enter(stateMachine: StateMachine) {
+        // TODO Confirm if this makes sense here
+        node.newTerm()
+        candidacyTerm = node.currentElectionTerm.number
         askForVotes(stateMachine)
     }
 
@@ -33,28 +42,37 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
     }
 
     private fun askForVotes(stateMachine: StateMachine) {
-        // TODO Confirm if this makes sense here
-        node.newTerm()
+        receivedVotes.clear()
 
         // Vote for itself
         stateMachine.handle(VoteReceived(node.currentElectionTerm.number, node.nodeAddress))
 
         client.broadcast(node.cluster) {
-            logger.info("Asking $it for a vote")
-            val reply = client.askForVote(it, node.nodeAddress, node.currentElectionTerm.number)
-            if (reply.voteGranted) {
-                stateMachine.handle(VoteReceived(node.currentElectionTerm.number, reply.voterAddress))
+            while (candidacyTerm == node.currentElectionTerm.number) {
+                try {
+                    logger.info("Asking $it for a vote")
+                    val reply = client.askForVote(it, node.nodeAddress, node.currentElectionTerm.number)
+                    if (reply.voteGranted) {
+                        stateMachine.handle(VoteReceived(node.currentElectionTerm.number, reply.voterAddress))
+                    }
+                    break
+                } catch (e: Exception) {
+                    logger.error("Error asking for votes from $it", e)
+                    delay(VOTE_REQUEST_TIMEOUT_MS)
+                }
             }
         }
     }
 
     private fun handleVoteReceived(e: VoteReceived): StateId {
-        return if (++receivedVotes > node.cluster.nodeCount / 2) {
-            // TODO: Consider moving to Leader enter actions?
-            node.cluster.updateLeader(node.nodeAddress, e.electionTerm, node.currentElectionTerm.number)
-            LEADER
+        if (e.electionTerm == node.currentElectionTerm.number) {
+            receivedVotes.add(e.voterAddress)
+            if (receivedVotes.count() > node.cluster.nodeCount / 2) {
+                return LEADER
+            }
         } else {
-            CANDIDATE
+            logger.info("Received vote for wrong election term $e")
         }
+        return CANDIDATE
     }
 }

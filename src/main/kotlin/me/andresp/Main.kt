@@ -52,7 +52,7 @@ fun main(args: Array<String>) {
     log.log()
 
     val selfAddress = NodeAddress(LOCAL_IP, cfg[config.httpPort])
-    val nodeClient = NodeClient(selfAddress, HttpClient(Apache) { install(JsonFeature)})
+    val nodeClient = NodeClient(selfAddress, HttpClient(Apache) { install(JsonFeature) })
     val stateMachine = StateMachine.construct(cfg, nodeClient, selfAddress)
     val server = startServer(httpPort, stateMachine, cmdProcessor, state)
     server.start(wait = false)

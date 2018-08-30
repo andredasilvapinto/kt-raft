@@ -19,6 +19,7 @@ class LeaderState(node: Node, client: NodeClient) : AState(LEADER, node, client)
     private var timerTask: TimerTask? = null
 
     override fun enter(stateMachine: StateMachine) {
+        node.handleNewLeader(node.nodeAddress, node.currentElectionTerm.number)
         stateMachine.cancelLeaderTimeout()
         scheduleHeartbeat()
     }

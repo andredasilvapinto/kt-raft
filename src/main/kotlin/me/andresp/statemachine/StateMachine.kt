@@ -25,7 +25,6 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
     companion object {
         val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
         val ELECTION_TIMEOUT_RANGE_MS = 1500..3000 //150..300
-        const val INITIAL_TIMEOUT_DELAY_MS = 5000L
 
         fun construct(cfg: Configuration, nodeClient: NodeClient, selfAddress: NodeAddress): StateMachine {
             val cluster = Cluster(cfg[config.numberNodes])
@@ -51,12 +50,12 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
 
             }
         }
-        scheduleLeaderTimeout(INITIAL_TIMEOUT_DELAY_MS)
+        scheduleLeaderTimeout()
     }
 
-    fun scheduleLeaderTimeout(extraDelayMs: Long = 0L) {
+    fun scheduleLeaderTimeout() {
         timerTask?.cancel()
-        val delayMs = extraDelayMs + ELECTION_TIMEOUT_RANGE_MS.random().toLong()
+        val delayMs = ELECTION_TIMEOUT_RANGE_MS.random().toLong()
         timerTask = timer.schedule(delayMs) {
             logger.info("Leader timeout $delayMs ms reached. Injecting timeout event.")
             launch {
@@ -84,7 +83,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
     private fun transitionState(newStateId: StateId) {
         val newState = states[newStateId]!!
         if (newState != currentState) {
-            logger.info("STATE CHANGE: ${currentState.id} -> ${newState.id}")
+            logger.info("STATE CHANGE: ${currentState.stateId} -> ${newState.stateId}")
             currentState = newState
             currentState.enter(this)
         }

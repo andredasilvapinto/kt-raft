@@ -58,12 +58,8 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
         return response
     }
 
-    fun broadcast(cluster: Cluster, f: suspend (NodeAddress) -> Unit) {
-        cluster.nodeAddresses.minus(selfAddress).map {
-            launch {
-                f(it)
-            }
-        }
-    }
+    fun broadcast(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcast(cluster.nodeAddresses.minus(selfAddress), f)
+
+    fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.map { launch { f(it) } }
 }
 
