@@ -1,6 +1,7 @@
 package me.andresp.statemachine
 
 import kotlinx.coroutines.experimental.delay
+import kotlinx.coroutines.experimental.launch
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
 import me.andresp.http.NodeClient
@@ -22,17 +23,15 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
     private var candidacyTerm: Int = 0
 
     override fun enter(stateMachine: StateMachine) {
-        // TODO Confirm if this makes sense here
-        node.newTerm()
-        candidacyTerm = node.currentElectionTerm.number
-        askForVotes(stateMachine)
+        startElection(stateMachine)
     }
 
     override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
         return when (e) {
+            is ElectionTimeout -> startElection(stateMachine)
             is LeaderHeartbeat -> handleLeaderHeartBeat(e, stateMachine)
             is VoteReceived -> handleVoteReceived(e)
-            is NodeJoined -> handleNodeJoined(e)
+            is NodeJoinedRequest -> handleNodeJoined(e)
             is VoteRequested -> handleVoteRequested(e)
             else -> {
                 logger.info("Candidate doesn't handle ${e.javaClass}. Ignoring.")
@@ -41,11 +40,23 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
         }
     }
 
+    private fun startElection(stateMachine: StateMachine): StateId {
+        node.newTerm()
+        candidacyTerm = node.currentElectionTerm.number
+        askForVotes(stateMachine)
+        stateMachine.scheduleElectionTimeout()
+        return CANDIDATE
+    }
+
     private fun askForVotes(stateMachine: StateMachine) {
         receivedVotes.clear()
 
-        // Vote for itself
-        stateMachine.handle(VoteReceived(node.currentElectionTerm.number, node.nodeAddress))
+        launch {
+            // Vote for itself
+            // needs to be done in a different coroutine so the synchronized handle
+            // blocks this from running before the current event is completely processed
+            stateMachine.handle(VoteReceived(node.currentElectionTerm.number, node.nodeAddress))
+        }
 
         client.broadcast(node.cluster) {
             while (candidacyTerm == node.currentElectionTerm.number) {

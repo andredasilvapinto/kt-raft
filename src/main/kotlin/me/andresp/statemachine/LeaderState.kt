@@ -20,7 +20,7 @@ class LeaderState(node: Node, client: NodeClient) : AState(LEADER, node, client)
 
     override fun enter(stateMachine: StateMachine) {
         node.handleNewLeader(node.nodeAddress, node.currentElectionTerm.number)
-        stateMachine.cancelLeaderTimeout()
+        stateMachine.cancelElectionTimeout()
         scheduleHeartbeat()
     }
 
@@ -39,12 +39,15 @@ class LeaderState(node: Node, client: NodeClient) : AState(LEADER, node, client)
         }
     }
 
-    private fun cancelHeartbeat() = timerTask?.cancel()
+    private fun cancelHeartbeat() {
+        logger.info("Cancelling leader heartbeats")
+        timerTask?.cancel()
+    }
 
     override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
         val newStateId = when (e) {
             is LeaderHeartbeat -> handleLeaderHeartBeat(e, stateMachine)
-            is NodeJoined -> handleNodeJoined(e)
+            is NodeJoinedRequest -> handleNodeJoined(e)
             is VoteRequested -> handleVoteRequested(e)
             else -> {
                 logger.info("LeaderState doesn't handle ${e.javaClass}. Ignoring.")
