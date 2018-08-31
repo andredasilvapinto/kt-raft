@@ -4,8 +4,7 @@ import kotlinx.coroutines.experimental.delay
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
 import me.andresp.http.NodeClient
-import me.andresp.statemachine.StateId.CANDIDATE
-import me.andresp.statemachine.StateId.LEADER
+import me.andresp.statemachine.StateId.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -70,6 +69,9 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
             if (receivedVotes.count() > node.cluster.nodeCount / 2) {
                 return LEADER
             }
+        } else if (e.electionTerm > node.currentElectionTerm.number) {
+            node.setCurrentElectionTerm(e.electionTerm)
+            return FOLLOWER
         } else {
             logger.info("Received vote for wrong election term $e")
         }
