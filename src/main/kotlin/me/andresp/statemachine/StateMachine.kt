@@ -3,6 +3,7 @@ package me.andresp.statemachine
 import com.natpryce.konfig.Configuration
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
+import me.andresp.api.NodeJoinedPayload
 import me.andresp.cluster.Cluster
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
@@ -16,11 +17,14 @@ import kotlin.concurrent.schedule
 
 
 class StateMachine(val node: Node, private val nodeClient: NodeClient, private val states: Map<StateId, AState>, initialState: AState) {
+    @Volatile
     var currentState = initialState
         private set
 
-    private val timer = Timer(true)
+    @Volatile
     private var timerTask: TimerTask? = null
+
+    private val timer = Timer(true)
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
@@ -45,27 +49,31 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
         } else {
             runBlocking {
                 logger.info("Joining cluster via $target")
-                val clusterStatus = nodeClient.join(target, node.nodeAddress)
-                node.cluster.setStatus(clusterStatus)
-
+                try {
+                    val clusterStatus = nodeClient.join(target, NodeJoinedPayload(node.nodeAddress))
+                    node.cluster.setStatus(clusterStatus)
+                } catch (e: Exception) {
+                    logger.error("Error when trying to join the cluster", e)
+                    throw e
+                }
             }
         }
-        scheduleLeaderTimeout()
+        scheduleElectionTimeout()
     }
 
-    fun scheduleLeaderTimeout() {
+    fun scheduleElectionTimeout() {
         timerTask?.cancel()
         val delayMs = ELECTION_TIMEOUT_RANGE_MS.random().toLong()
         timerTask = timer.schedule(delayMs) {
-            logger.info("Leader timeout $delayMs ms reached. Injecting timeout event.")
+            logger.info("Election timeout $delayMs ms reached. Injecting timeout event.")
             launch {
-                handle(LeaderHeartbeatTimeout(node.currentElectionTerm.number))
+                handle(ElectionTimeout(node.currentElectionTerm.number))
             }
         }
     }
 
-    fun cancelLeaderTimeout() {
-        logger.info("Cancelling leader timeout")
+    fun cancelElectionTimeout() {
+        logger.info("Cancelling election timeout")
         timerTask?.cancel()
     }
 

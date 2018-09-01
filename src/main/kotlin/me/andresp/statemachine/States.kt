@@ -12,20 +12,27 @@ abstract class AState(val stateId: StateId, protected val node: Node, protected 
     protected fun handleLeaderHeartBeat(e: LeaderHeartbeat, stateMachine: StateMachine): StateId =
             if (e.electionTerm > node.currentElectionTerm.number) {
                 node.handleNewLeader(e.leaderAddress, e.electionTerm)
-                stateMachine.scheduleLeaderTimeout()
+                stateMachine.scheduleElectionTimeout()
                 StateId.FOLLOWER
             } else {
                 if (e.leaderAddress == node.cluster.leader) {
-                    // reset timeout :: TODO what if it is in candidate state?
-                    stateMachine.scheduleLeaderTimeout()
+                    // reset timeout
+                    stateMachine.scheduleElectionTimeout()
                 }
                 stateId
             }
 
-    protected fun handleNodeJoined(e: NodeJoined): StateId {
-        node.cluster.addNode(e.joinerAddress)
-        // TODO send only to old nodes?? or not send at all and wait till time out?
-        //cluster.nodeAddresses.map { client.sendHeartbeat(it, cluster.getStatus()) }
+    protected open fun handleNodeJoined(e: NodeJoinedRequest): StateId {
+        if (!e.payload.forwarded) {
+            client.broadcastAndWait(node.cluster) {
+                client.join(it, e.payload.copy(forwarded = true))
+            }
+        }
+
+        node.cluster.addNode(e.payload.joinerAddress)
+
+        e.reply(node.cluster.getStatus())
+
         return stateId
     }
 

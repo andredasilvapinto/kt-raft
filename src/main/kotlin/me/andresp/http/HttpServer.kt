@@ -17,15 +17,12 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.experimental.runBlocking
 import me.andresp.api.AskVotePayload
-import me.andresp.cluster.NodeAddress
+import me.andresp.api.NodeJoinedPayload
 import me.andresp.data.CommandProcessor
 import me.andresp.data.ConsolidatedReadOnlyState
 import me.andresp.data.newDelete
 import me.andresp.data.newSet
-import me.andresp.statemachine.LeaderHeartbeat
-import me.andresp.statemachine.NodeJoined
-import me.andresp.statemachine.StateMachine
-import me.andresp.statemachine.VoteRequested
+import me.andresp.statemachine.*
 
 data class Item(val key: String, val value: String)
 data class ItemValue(val value: String)
@@ -42,21 +39,13 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
             }
         }
         routing {
-            get("/data/{key}") {
-                val key = call.parameters["key"]!!
-                val value = stateConsolidated.get(key)
-                if (value == null) {
-                    call.respond(HttpStatusCode.NotFound)
-                } else {
-                    call.respond(Item(key, value))
+            put("/cluster/join") { it ->
+                val nodeJoinedPayload = call.receive<NodeJoinedPayload>()
+                logger.info("Received join request $nodeJoinedPayload")
+                val nodeJoinedRequest = NodeJoinedRequest(nodeJoinedPayload) {
+                    runBlocking { call.respond(HttpStatusCode.OK, it) }
                 }
-            }
-            put("/cluster/join") {
-                val joinerAddress = call.receive<NodeAddress>()
-                logger.info("Received join request from $joinerAddress")
-                val nodeJoined = NodeJoined(joinerAddress)
-                stateMachine.handle(nodeJoined)
-                call.respond(HttpStatusCode.OK, stateMachine.node.cluster.getStatus())
+                stateMachine.handle(nodeJoinedRequest)
             }
             put("/cluster/ask-vote/{term}") { _ ->
                 val askVotePayload = call.receive<AskVotePayload>()
@@ -77,6 +66,15 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 val leaderHeartbeat = call.receive<LeaderHeartbeat>()
                 logger.info("Received heartbeat $leaderHeartbeat")
                 stateMachine.handle(leaderHeartbeat)
+            }
+            get("/data/{key}") {
+                val key = call.parameters["key"]!!
+                val value = stateConsolidated.get(key)
+                if (value == null) {
+                    call.respond(HttpStatusCode.NotFound)
+                } else {
+                    call.respond(Item(key, value))
+                }
             }
             post("/data/{key}") {
                 val key = call.parameters["key"]!!
