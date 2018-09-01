@@ -42,6 +42,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
         }
     }
 
+    @Synchronized
     fun start(target: NodeAddress?) {
         if (target == null) {
             logger.info("Starting a new cluster")
@@ -92,6 +93,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
         val newState = states[newStateId]!!
         if (newState != currentState) {
             logger.info("STATE CHANGE: ${currentState.stateId} -> ${newState.stateId}")
+            currentState.leave(this)
             currentState = newState
             currentState.enter(this)
         }

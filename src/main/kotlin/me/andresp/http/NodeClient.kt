@@ -1,6 +1,8 @@
 package me.andresp.http
 
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.apache.Apache
+import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.request.request
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
@@ -24,6 +26,18 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(NodeClient::class.java)
+
+        fun defaultClient(selfAddress: NodeAddress): NodeClient =
+                NodeClient(selfAddress, HttpClient(Apache.create {
+                    socketTimeout = 5_000
+                    connectTimeout = 5_000
+                    connectionRequestTimeout = 10_000
+
+                    customizeClient {
+                        setMaxConnTotal(100)
+                        setMaxConnPerRoute(100)
+                    }
+                }) { install(JsonFeature) })
     }
 
     suspend fun join(targetAddress: NodeAddress, nodeJoinedPayload: NodeJoinedPayload): ClusterStatus =
@@ -31,17 +45,6 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
 
     suspend fun askForVote(targetAddress: NodeAddress, candidateAddress: NodeAddress, electionTerm: Int): AskVoteReply =
             putJson(targetAddress, "/cluster/ask-vote/$electionTerm", AskVotePayload(electionTerm, candidateAddress, 1L, 1)) // TODO Implement lastlog args
-
-//    suspend fun voteFor(leaderAddress: NodeAddress, candidateAddress: NodeAddress, electionTerm: Int) {
-//        httpClient.post<NodeAddress>(
-//                host = candidateAddress.host,
-//                port = candidateAddress.port,
-//                path = "/cluster/vote/$electionTerm",
-//                body = leaderAddress
-//        ) {
-//            contentType(ContentType.Application.Json)
-//        }
-//    }
 
     suspend fun sendHeartbeat(targetAddress: NodeAddress, leaderHearbeat: LeaderHeartbeat): String =
             putJson(targetAddress, "/cluster/heartbeat", leaderHearbeat)

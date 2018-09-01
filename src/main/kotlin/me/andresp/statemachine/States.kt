@@ -7,6 +7,8 @@ import me.andresp.http.NodeClient
 abstract class AState(val stateId: StateId, protected val node: Node, protected val client: NodeClient) {
     open fun enter(stateMachine: StateMachine) {}
 
+    open fun leave(stateMachine: StateMachine) {}
+
     abstract fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId
 
     protected fun handleLeaderHeartBeat(e: LeaderHeartbeat, stateMachine: StateMachine): StateId =
@@ -35,13 +37,10 @@ abstract class AState(val stateId: StateId, protected val node: Node, protected 
 
     protected fun handleVoteRequested(e: VoteRequested): StateId {
         // TODO: Implement voting logic with log index. Improve thread safety
-        val newerTerm = e.askVotePayload.electionTerm > node.currentElectionTerm.number
+        val newerTerm = node.updateTermIfNewer(e.askVotePayload.electionTerm)
         val sameTerm = e.askVotePayload.electionTerm == node.currentElectionTerm.number
         val noVoteYet = node.currentElectionTerm.votedFor == null
 
-        if (newerTerm) {
-            node.setCurrentElectionTerm(e.askVotePayload.electionTerm)
-        }
         val reply = newerTerm || (sameTerm && noVoteYet)
 
         e.reply(AskVoteReply(node.currentElectionTerm.number, node.nodeAddress, reply))
