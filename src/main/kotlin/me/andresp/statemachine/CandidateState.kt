@@ -13,16 +13,17 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(CandidateState::class.java)
-        const val VOTE_REQUEST_TIMEOUT_MS = 500
     }
 
-    private val receivedVotes = mutableSetOf<NodeAddress>()
-
     @Volatile
-    private var candidacyTerm: Int = 0
+    private lateinit var candidacy: Candidacy
 
     override fun enter(stateMachine: StateMachine) {
         startElection(stateMachine)
+    }
+
+    override fun leave(stateMachine: StateMachine) {
+        candidacy.stop()
     }
 
     override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
@@ -41,30 +42,66 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
 
     private fun startElection(stateMachine: StateMachine): StateId {
         node.newTerm()
-        candidacyTerm = node.currentElectionTerm.number
-        askForVotes(stateMachine)
         stateMachine.scheduleElectionTimeout()
+        if (this::candidacy.isInitialized) {
+            candidacy.stop()
+        }
+        candidacy = Candidacy(node.currentElectionTerm.number, stateMachine, client, node)
+        candidacy.askForVotes()
         return CANDIDATE
     }
 
-    private fun askForVotes(stateMachine: StateMachine) {
-        receivedVotes.clear()
+    private fun handleVoteReceived(e: VoteReceived): StateId =
+            if (e.electionTerm == node.currentElectionTerm.number) {
+                if (e.electionTerm == candidacy.term) {
+                    candidacy.handleVoteReceived(e)
+                    if (candidacy.totalVotes > node.cluster.nodeCount / 2) {
+                        LEADER
+                    } else {
+                        CANDIDATE
+                    }
+                } else {
+                    // Should never happen
+                    throw IllegalStateException("Candidacy object is outdated: ${candidacy.term} vs ${e.electionTerm}")
+                }
+            } else if (node.updateTermIfNewer(e.electionTerm)) {
+                FOLLOWER
+            } else {
+                logger.info("Received vote for old election term $e. Ignoring.")
+                CANDIDATE
+            }
+}
 
+private class Candidacy(val term: Int, private val stateMachine: StateMachine, private val client: NodeClient, private val node: Node) {
+
+    companion object {
+        val logger: Logger = LoggerFactory.getLogger(Candidacy::class.java)
+        const val VOTE_REQUEST_TIMEOUT_MS = 500
+    }
+
+    private val receivedVotes = mutableSetOf<NodeAddress>()
+
+    @Volatile
+    private var active = true
+
+    val totalVotes: Int
+        get() = receivedVotes.size
+
+    fun askForVotes() {
         launch {
             // Vote for itself
             // needs to be done in a different coroutine so the synchronized handle
             // blocks this from running before the current event is completely processed
-            stateMachine.handle(VoteReceived(node.currentElectionTerm.number, node.nodeAddress))
+            stateMachine.handle(VoteReceived(term, node.nodeAddress))
         }
 
         client.broadcast(node.cluster) {
-            while (candidacyTerm == node.currentElectionTerm.number
-                    && stateMachine.currentState.stateId == CANDIDATE) {
+            while (active) {
                 try {
                     logger.info("Asking $it for a vote")
-                    val reply = client.askForVote(it, node.nodeAddress, node.currentElectionTerm.number)
+                    val reply = client.askForVote(it, node.nodeAddress, term)
                     if (reply.voteGranted) {
-                        stateMachine.handle(VoteReceived(node.currentElectionTerm.number, reply.voterAddress))
+                        stateMachine.handle(VoteReceived(term, reply.voterAddress))
                     }
                     break
                 } catch (e: Exception) {
@@ -75,18 +112,14 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
         }
     }
 
-    private fun handleVoteReceived(e: VoteReceived): StateId {
-        if (e.electionTerm == node.currentElectionTerm.number) {
-            receivedVotes.add(e.voterAddress)
-            if (receivedVotes.count() > node.cluster.nodeCount / 2) {
-                return LEADER
-            }
-        } else if (e.electionTerm > node.currentElectionTerm.number) {
-            node.setCurrentElectionTerm(e.electionTerm)
-            return FOLLOWER
-        } else {
-            logger.info("Received vote for wrong election term $e")
+    fun handleVoteReceived(e: VoteReceived) {
+        receivedVotes.add(e.voterAddress)
+    }
+
+    fun stop() {
+        if (active) {
+            logger.info("Stopping candidacy $term")
         }
-        return CANDIDATE
+        active = false
     }
 }

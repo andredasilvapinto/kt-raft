@@ -4,9 +4,6 @@ import com.natpryce.konfig.CommandLineOption
 import com.natpryce.konfig.ConfigurationProperties
 import com.natpryce.konfig.overriding
 import com.natpryce.konfig.parseArgs
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.apache.Apache
-import io.ktor.client.features.json.JsonFeature
 import me.andresp.cluster.NodeAddress
 import me.andresp.config.config
 import me.andresp.data.*
@@ -52,7 +49,7 @@ fun main(args: Array<String>) {
     log.log()
 
     val selfAddress = NodeAddress(LOCAL_IP, cfg[config.httpPort])
-    val nodeClient = NodeClient(selfAddress, HttpClient(Apache) { install(JsonFeature) })
+    val nodeClient = NodeClient.defaultClient(selfAddress)
     val stateMachine = StateMachine.construct(cfg, nodeClient, selfAddress)
     val server = startServer(httpPort, stateMachine, cmdProcessor, state)
     server.start(wait = false)

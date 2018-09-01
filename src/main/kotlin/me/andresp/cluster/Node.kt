@@ -2,9 +2,10 @@ package me.andresp.cluster
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.util.concurrent.atomic.AtomicReference
 
 
-// TODO Strange that cluster is inside Cluster ?
+// TODO Strange that cluster is inside Node ?
 class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
 
     companion object {
@@ -12,19 +13,21 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
     }
 
     // TODO: needs to be persisted to disk
-    // TODO: Improve thread-safety of conditional actions
-    @Volatile
-    var currentElectionTerm = Term(0, null)
-        private set
+    private var currentElectionTermRef = AtomicReference<Term>(Term(0, null))
 
+    var currentElectionTerm = currentElectionTermRef.get()!!
+        get() = currentElectionTermRef.get()
+
+    @Synchronized
     fun newTerm() {
-        setCurrentElectionTerm(currentElectionTerm.number + 1)
+        setCurrentElectionTerm(currentElectionTermRef.get().number + 1)
     }
 
+    // TODO: Still need synchronized because of atomic change of leader and term (perhaps move leader inside Term?)
     @Synchronized
     fun handleNewLeaderTerm(newLeader: NodeAddress, newLeaderElectionTerm: Int) {
         if (newLeaderElectionTerm < currentElectionTerm.number) {
-            throw IllegalArgumentException("Trying to set older leader $newLeader from term $newLeaderElectionTerm when we are already in term $currentElectionTerm")
+            throw IllegalArgumentException("Trying to set older leader $newLeader from term $newLeaderElectionTerm when we are already in term $currentElectionTermRef")
         } else {
             if (newLeader != cluster.leader) {
                 cluster.updateLeader(newLeader)
@@ -36,9 +39,23 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
         }
     }
 
+    @Synchronized
     fun setCurrentElectionTerm(electionTerm: Int) {
-        currentElectionTerm = Term(electionTerm, null)
+        currentElectionTermRef.set(Term(electionTerm, null))
         logger.info("Changed current election term to $currentElectionTerm")
+    }
+
+    fun updateTermIfNewer(electionTerm: Int): Boolean {
+        val (oldTerm, _) = currentElectionTermRef.getAndUpdate {
+            if (electionTerm > it.number) {
+                // TODO: Who is the leader now?
+                logger.info("Changed current election term to $electionTerm")
+                Term(electionTerm, null)
+            } else {
+                it
+            }
+        }
+        return electionTerm > oldTerm
     }
 }
 
