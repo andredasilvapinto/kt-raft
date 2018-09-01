@@ -10,15 +10,12 @@ abstract class AState(val stateId: StateId, protected val node: Node, protected 
     abstract fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId
 
     protected fun handleLeaderHeartBeat(e: LeaderHeartbeat, stateMachine: StateMachine): StateId =
-            if (e.electionTerm > node.currentElectionTerm.number) {
-                node.handleNewLeader(e.leaderAddress, e.electionTerm)
+            if (e.electionTerm >= node.currentElectionTerm.number) {
+                node.handleNewLeaderTerm(e.leaderAddress, e.electionTerm)
                 stateMachine.scheduleElectionTimeout()
+                node.cluster.setStatus(e.clusterStatus)
                 StateId.FOLLOWER
             } else {
-                if (e.leaderAddress == node.cluster.leader) {
-                    // reset timeout
-                    stateMachine.scheduleElectionTimeout()
-                }
                 stateId
             }
 

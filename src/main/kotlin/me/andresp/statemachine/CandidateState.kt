@@ -58,7 +58,8 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
         }
 
         client.broadcast(node.cluster) {
-            while (candidacyTerm == node.currentElectionTerm.number) {
+            while (candidacyTerm == node.currentElectionTerm.number
+                    && stateMachine.currentState.stateId == CANDIDATE) {
                 try {
                     logger.info("Asking $it for a vote")
                     val reply = client.askForVote(it, node.nodeAddress, node.currentElectionTerm.number)
@@ -68,7 +69,7 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
                     break
                 } catch (e: Exception) {
                     logger.error("Error asking for votes from $it", e)
-                    delay(VOTE_REQUEST_TIMEOUT_MS)
+                    delay(VOTE_REQUEST_TIMEOUT_MS) // TODO Implement exponential backoff
                 }
             }
         }

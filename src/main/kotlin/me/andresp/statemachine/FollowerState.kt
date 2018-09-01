@@ -13,6 +13,10 @@ class FollowerState(node: Node, client: NodeClient) : AState(FOLLOWER, node, cli
         val logger: Logger = LoggerFactory.getLogger(FollowerState::class.java)
     }
 
+    override fun enter(stateMachine: StateMachine) {
+        stateMachine.scheduleElectionTimeout()
+    }
+
     override fun <T : Event> handle(e: T, stateMachine: StateMachine): StateId {
         return when (e) {
             is LeaderHeartbeat -> handleLeaderHeartBeat(e, stateMachine)

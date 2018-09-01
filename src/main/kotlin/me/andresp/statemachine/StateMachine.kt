@@ -58,7 +58,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
                 }
             }
         }
-        scheduleElectionTimeout()
+        currentState.enter(this)
     }
 
     fun scheduleElectionTimeout() {
