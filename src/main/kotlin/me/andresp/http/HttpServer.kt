@@ -16,6 +16,7 @@ import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.experimental.runBlocking
+import me.andresp.api.AppendEntriesReply
 import me.andresp.api.AskVotePayload
 import me.andresp.api.NodeJoinedPayload
 import me.andresp.data.CommandProcessor
@@ -66,6 +67,8 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 val leaderHeartbeat = call.receive<LeaderHeartbeat>()
                 logger.info("Received heartbeat $leaderHeartbeat")
                 stateMachine.handle(leaderHeartbeat)
+                // TODO: Implement a better way to handle RPC replies (maybe multiple return on handle()?). Hardcoded replies for now.
+                call.respond(HttpStatusCode.OK, AppendEntriesReply(stateMachine.node.currentElectionTerm.number, true))
             }
             get("/data/{key}") {
                 val key = call.parameters["key"]!!
