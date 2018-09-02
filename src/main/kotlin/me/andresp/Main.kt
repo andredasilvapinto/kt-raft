@@ -13,6 +13,7 @@ import me.andresp.http.startServer
 import me.andresp.statemachine.StateMachine
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 
 val logger = LoggerFactory.getLogger("main")!!
@@ -52,6 +53,11 @@ fun main(args: Array<String>) {
     val nodeClient = NodeClient.defaultClient(selfAddress)
     val stateMachine = StateMachine.construct(cfg, nodeClient, selfAddress)
     val server = startServer(httpPort, stateMachine, cmdProcessor, state)
-    server.start(wait = false)
-    stateMachine.start(target)
+
+    try {
+        server.start(wait = false)
+        stateMachine.start(target)
+    } catch (e: Throwable) {
+        server.stop(1000L, 1000L, TimeUnit.MILLISECONDS)
+    }
 }

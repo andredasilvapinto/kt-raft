@@ -1,6 +1,8 @@
 buildscript {
     ext.kotlin_version = '1.2.61'
     ext.serialization_version = '0.6.1'
+    ext.coroutines_version = '0.25.0'
+
     ext.ktor_version = '0.9.3'
     ext.log4j_version = '2.10.0'
 
@@ -49,6 +51,7 @@ dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     compile "org.jetbrains.kotlinx:kotlinx-serialization-runtime:$serialization_version"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines_version"
 
     compile 'org.mapdb:mapdb:3.0.5'
     compile 'com.squareup.tape2:tape:2.0.0-20171208.175004-35'
