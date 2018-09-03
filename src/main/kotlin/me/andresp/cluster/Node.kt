@@ -2,6 +2,7 @@ package me.andresp.cluster
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.*
 import java.util.concurrent.atomic.AtomicReference
 
 
@@ -12,8 +13,15 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
         val logger: Logger = LoggerFactory.getLogger(Node::class.java)
     }
 
-    // TODO: needs to be persisted to disk
-    private var currentElectionTermRef = AtomicReference<Term>(Term(0, null))
+    private val termFilePath = "term_${nodeAddress.port}.sav"
+
+    private var currentElectionTermRef = AtomicReference<Term>(
+            if (File(termFilePath).exists()) {
+                Term.load(termFilePath)
+            } else {
+                Term(0, null)
+            }
+    )
 
     var currentElectionTerm = currentElectionTermRef.get()!!
         get() = currentElectionTermRef.get()
@@ -42,6 +50,7 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
     @Synchronized
     fun setCurrentElectionTerm(electionTerm: Int) {
         currentElectionTermRef.set(Term(electionTerm, null))
+        currentElectionTerm.save(termFilePath)
         logger.info("Changed current election term to $currentElectionTerm")
     }
 
@@ -50,6 +59,7 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
             if (electionTerm > it.number) {
                 // TODO: Who is the leader now?
                 logger.info("Changed current election term to $electionTerm")
+                currentElectionTerm.save(termFilePath)
                 Term(electionTerm, null)
             } else {
                 it
@@ -62,4 +72,19 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
 data class NodeAddress(val host: String, val port: Int)
 
 
-data class Term(val number: Int, @Volatile var votedFor: NodeAddress?)
+data class Term(val number: Int, @Volatile var votedFor: NodeAddress?) : Serializable {
+    fun save(filePath: String) {
+        ObjectOutputStream(FileOutputStream(filePath)).use { it.writeObject(this) }
+    }
+
+    companion object {
+        fun load(filePath: String): Term =
+                ObjectInputStream(FileInputStream(filePath)).use {
+                    val obj = it.readObject()
+                    when (obj) {
+                        is Term -> obj
+                        else -> throw RuntimeException("Error desserializing $filePath. Expected Term, found $obj")
+                    }
+                }
+    }
+}
