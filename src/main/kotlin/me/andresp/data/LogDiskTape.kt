@@ -8,7 +8,11 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 
-class LogDisk(filePath: String) : Log {
+class LogDiskTape(filePath: String) : Log {
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(this::class.java)
+    }
 
     private val queue: ObjectQueue<Command>
 
@@ -17,31 +21,22 @@ class LogDisk(filePath: String) : Log {
         queue = ObjectQueue.create(queueFile, CommandConverter())
     }
 
-    override fun append(cmd: Command) {
-        queue.add(cmd)
-    }
+    override fun append(cmd: Command) = queue.add(cmd)
 
-    override fun toString() = queue.asList().fold("", { acc, cmd -> "$acc $cmd" })
+    override fun toString() = queue.asList().fold("") { acc, cmd -> "$acc $cmd" }
 
     override fun log() = logger.info("Current log: $this")
 
-    override fun commands(): List<Command> {
-        return queue.asList()
-    }
+    override fun commands() = queue.asList()
+
+    override fun close() = queue.close()
+
 
     private class CommandConverter : ObjectQueue.Converter<Command> {
         @Throws(IOException::class)
-        override fun from(bytes: ByteArray): Command {
-            return CBOR.load(bytes)
-        }
+        override fun from(bytes: ByteArray) = CBOR.load<Command>(bytes)
 
         @Throws(IOException::class)
-        override fun toStream(cmd: Command, os: OutputStream) {
-            os.write(CBOR.Companion.dump(cmd))
-        }
-    }
-
-    private companion object {
-        private val logger = LoggerFactory.getLogger(this::class.java)
+        override fun toStream(cmd: Command, os: OutputStream): Unit = os.write(CBOR.dump(cmd))
     }
 }

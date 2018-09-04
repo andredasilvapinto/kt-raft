@@ -1,6 +1,8 @@
 package me.andresp.data
 
-interface Log {
+import java.io.Closeable
+
+interface Log: Closeable {
 
     override fun toString(): String
 

@@ -68,7 +68,7 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 logger.info("Received heartbeat $leaderHeartbeat")
                 stateMachine.handle(leaderHeartbeat)
                 // TODO: Implement a better way to handle RPC replies (maybe multiple return on handle()?). Hardcoded replies for now.
-                call.respond(HttpStatusCode.OK, AppendEntriesReply(stateMachine.node.currentElectionTerm.number, true))
+                call.respond(HttpStatusCode.OK, AppendEntriesReply(stateMachine.node.currentElectionTerm.number, true, 0))
             }
             get("/data/{key}") {
                 val key = call.parameters["key"]!!
