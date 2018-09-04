@@ -38,7 +38,7 @@ fun main(args: Array<String>) {
     logger.info("Creating new log at: $logPath")
     File(logPath).deleteRecursively()
 
-    val log = LogDisk(logPath)
+    val log = LogDiskEhCache(logPath)
     val state = InMemoryConsolidatedState()
 
     val cmdProcessor = CommandProcessor(log, state)
@@ -59,5 +59,6 @@ fun main(args: Array<String>) {
         stateMachine.start(target)
     } catch (e: Throwable) {
         server.stop(1000L, 1000L, TimeUnit.MILLISECONDS)
+        log.close()
     }
 }
