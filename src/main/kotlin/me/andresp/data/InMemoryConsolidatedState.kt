@@ -20,7 +20,7 @@ class InMemoryConsolidatedState : ConsolidatedState {
     override fun get(key: String) = map[key]
 
     override fun set(key: String, value: String) {
-        map.put(key, value)
+        map[key] = value
     }
 
     override fun del(key: String) {
