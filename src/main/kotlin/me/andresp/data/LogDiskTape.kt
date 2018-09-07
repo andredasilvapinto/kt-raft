@@ -27,7 +27,7 @@ class LogDiskTape(filePath: String) : Log {
 
     override fun log() = logger.info("Current log: $this")
 
-    override fun commands() = queue.asList()
+    override fun commands(): List<Command> = queue.asList()!!
 
     override fun close() = queue.close()
 
