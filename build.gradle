@@ -54,7 +54,6 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines_version"
 
     compile 'org.mapdb:mapdb:3.0.7'
-    compile 'com.squareup.tape2:tape:2.0.0-20171208.175004-35'
     compile 'org.ehcache:ehcache:3.6.0'
 
     compile 'com.natpryce:konfig:1.6.1.0'

@@ -1,13 +1,11 @@
 package me.andresp.statemachine
 
-import com.natpryce.konfig.Configuration
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
 import me.andresp.api.NodeJoinedPayload
-import me.andresp.cluster.Cluster
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
-import me.andresp.config.config
+import me.andresp.data.CommandProcessor
 import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.*
 import org.slf4j.Logger
@@ -27,16 +25,14 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
     private val timer = Timer(true)
 
     companion object {
-        val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
+        private val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
         val ELECTION_TIMEOUT_RANGE_MS = 1500..3000 //150..300
 
-        fun construct(cfg: Configuration, nodeClient: NodeClient, selfAddress: NodeAddress): StateMachine {
-            val cluster = Cluster(cfg[config.numberNodes])
-            val node = Node(selfAddress, cluster)
+        fun construct(node: Node, nodeClient: NodeClient, cmdProcessor: CommandProcessor): StateMachine {
             val states = mapOf(
-                    FOLLOWER to FollowerState(node, nodeClient),
-                    CANDIDATE to CandidateState(node, nodeClient),
-                    LEADER to LeaderState(node, nodeClient)
+                    FOLLOWER to FollowerState(node, nodeClient, cmdProcessor),
+                    CANDIDATE to CandidateState(node, nodeClient, cmdProcessor),
+                    LEADER to LeaderState(node, nodeClient, cmdProcessor)
             )
             return StateMachine(node, nodeClient, states, states[FOLLOWER]!!)
         }
@@ -51,7 +47,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
             runBlocking {
                 logger.info("Joining cluster via $target")
                 try {
-                    val clusterStatus = nodeClient.join(target, NodeJoinedPayload(node.nodeAddress))
+                    val clusterStatus = nodeClient.sendJoinNotification(target, NodeJoinedPayload(node.nodeAddress))
                     node.cluster.setStatus(clusterStatus)
                 } catch (e: Exception) {
                     logger.error("Error when trying to join the cluster", e)

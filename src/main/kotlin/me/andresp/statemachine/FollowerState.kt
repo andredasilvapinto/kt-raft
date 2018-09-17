@@ -1,13 +1,18 @@
 package me.andresp.statemachine
 
 import me.andresp.cluster.Node
+import me.andresp.data.CommandProcessor
 import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.CANDIDATE
 import me.andresp.statemachine.StateId.FOLLOWER
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class FollowerState(node: Node, client: NodeClient) : AState(FOLLOWER, node, client) {
+class FollowerState(
+        node: Node,
+        client: NodeClient,
+        cmdProcessor: CommandProcessor
+) : AState(FOLLOWER, node, client, cmdProcessor) {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(FollowerState::class.java)
@@ -23,6 +28,7 @@ class FollowerState(node: Node, client: NodeClient) : AState(FOLLOWER, node, cli
             is ElectionTimeout -> CANDIDATE
             is VoteRequested -> handleVoteRequested(e)
             is NodeJoinedRequest -> handleNodeJoined(e)
+            is AppendEntriesWrapper -> handleAppendEntry(e)
             else -> {
                 logger.info("FollowerState doesn't handle ${e.javaClass}. Ignoring.")
                 FOLLOWER
