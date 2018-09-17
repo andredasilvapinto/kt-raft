@@ -15,8 +15,6 @@ class InMemoryConsolidatedState : ConsolidatedState {
 
     override fun toString() = map.asIterable().joinToString { "${it.key}: ${it.value}" }
 
-    override fun log() = logger.info("Current state: $this")
-
     override fun get(key: String) = map[key]
 
     override fun set(key: String, value: String) {

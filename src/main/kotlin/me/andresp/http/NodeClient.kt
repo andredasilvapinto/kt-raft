@@ -11,11 +11,13 @@ import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.awaitAll
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
+import me.andresp.api.AppendEntriesReply
 import me.andresp.api.AskVotePayload
 import me.andresp.api.NodeJoinedPayload
 import me.andresp.cluster.Cluster
 import me.andresp.cluster.ClusterStatus
 import me.andresp.cluster.NodeAddress
+import me.andresp.statemachine.AppendEntries
 import me.andresp.statemachine.AskVoteReply
 import me.andresp.statemachine.LeaderHeartbeat
 import org.slf4j.Logger
@@ -38,16 +40,23 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
                         setMaxConnPerRoute(100)
                     }
                 }) { install(JsonFeature) })
+
+        fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.map { launch { f(it) } }
+
+        fun broadcastAndWait(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = runBlocking { nodeAddresses.map { async { f(it) } }.awaitAll() }
     }
 
-    suspend fun join(targetAddress: NodeAddress, nodeJoinedPayload: NodeJoinedPayload): ClusterStatus =
-            putJson(targetAddress, "/cluster/join", nodeJoinedPayload)
+    suspend fun sendJoinNotification(targetAddress: NodeAddress, nodeJoinedPayload: NodeJoinedPayload): ClusterStatus =
+            putJson(targetAddress, ENDPOINT_CLUSTER_JOIN, nodeJoinedPayload)
 
-    suspend fun askForVote(targetAddress: NodeAddress, candidateAddress: NodeAddress, electionTerm: Int): AskVoteReply =
-            putJson(targetAddress, "/cluster/ask-vote/$electionTerm", AskVotePayload(electionTerm, candidateAddress, 1L, 1)) // TODO Implement lastlog args
+    suspend fun sendRequestForVote(targetAddress: NodeAddress, askVotePayload: AskVotePayload): AskVoteReply =
+            putJson(targetAddress, "$ENDPOINT_CLUSTER_ASK_VOTE/${askVotePayload.electionTerm}", askVotePayload)
 
     suspend fun sendHeartbeat(targetAddress: NodeAddress, leaderHearbeat: LeaderHeartbeat): String =
-            putJson(targetAddress, "/cluster/heartbeat", leaderHearbeat)
+            putJson(targetAddress, ENDPOINT_CLUSTER_HEARTBEAT, leaderHearbeat)
+
+    suspend fun sendAppendEntry(targetAddress: NodeAddress, appendEntries: AppendEntries): AppendEntriesReply =
+            putJson(targetAddress, ENDPOINT_LOG_APPEND, appendEntries)
 
     private suspend inline fun <reified T> putJson(targetAddress: NodeAddress, path: String, body: Any): T {
         val response = httpClient.request<T> {
@@ -67,10 +76,6 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
 
     fun broadcast(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcast(cluster.nodeAddresses.minus(selfAddress), f)
 
-    fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.map { launch { f(it) } }
-
     fun broadcastAndWait(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcastAndWait(cluster.nodeAddresses.minus(selfAddress), f)
-
-    fun broadcastAndWait(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = runBlocking { nodeAddresses.map { async { f(it) } }.awaitAll() }
 }
 

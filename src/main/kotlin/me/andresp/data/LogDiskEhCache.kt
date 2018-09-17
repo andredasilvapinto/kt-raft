@@ -10,7 +10,6 @@ import org.ehcache.config.builders.CacheManagerBuilder
 import org.ehcache.config.builders.CacheManagerBuilder.newCacheManagerBuilder
 import org.ehcache.config.builders.ResourcePoolsBuilder
 import org.ehcache.config.units.MemoryUnit
-import org.ehcache.core.spi.service.FileBasedPersistenceContext
 import org.ehcache.spi.serialization.Serializer
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -22,42 +21,51 @@ class LogDiskEhCache(filePath: String) : Log {
 
     private companion object {
         private val logger = LoggerFactory.getLogger(this::class.java)
+        private const val DISK_CACHE = "disk-log"
     }
 
     private val cacheManager: PersistentCacheManager
-    private val cache: Cache<Int, Command>
-    private val index: AtomicInteger = AtomicInteger()
+    private val diskStore: Cache<Int, Command>
+    private val nextIndex: AtomicInteger = AtomicInteger(0)
 
     init {
         cacheManager = newCacheManagerBuilder()
                 .with(CacheManagerBuilder.persistence(File(filePath)))
-                .withCache("log",
-                        newCacheConfigurationBuilder(Int::class.javaObjectType, Command::class.java,
-                                ResourcePoolsBuilder.newResourcePoolsBuilder().disk(10, MemoryUnit.MB, true))
-                                .withValueSerializer(CommandSerializer::class.java)
-                                .build())
+                .withCache(DISK_CACHE,
+                        newCacheConfigurationBuilder(
+                                Int::class.javaObjectType,
+                                Command::class.java,
+                                ResourcePoolsBuilder.newResourcePoolsBuilder()
+                                        .disk(10, MemoryUnit.MB, true)
+                        ).withValueSerializer(CommandSerializer::class.java).build()
+                )
                 .build(true)
 
-        cache = cacheManager.getCache("log", Int::class.javaObjectType, Command::class.java)
+        diskStore = cacheManager.getCache(DISK_CACHE, Int::class.javaObjectType, Command::class.java)
+
+        nextIndex.set(diskStore.count())
 
         Runtime.getRuntime().addShutdownHook(Thread { close() })
     }
 
     override fun append(cmd: Command) {
-        index.getAndUpdate {
-            cache.put(it, cmd)
+        nextIndex.getAndUpdate {
+            diskStore.put(it, cmd)
             it + 1
         }
     }
 
-    override fun toString() = cache.toList().fold("") { acc, cmd -> "$acc ${cmd.key} - ${cmd.value}, " }
+    override fun toString() = diskStore.toList().fold("") { acc, cmd -> "$acc ${cmd.key} - ${cmd.value}, " }
 
-    override fun log() = logger.info("Current log: $this")
+    override fun commands(includePending: Boolean): List<Command> = diskStore.asSequence().sortedBy { it.key }.map { it.value }.toList()
 
-    override fun commands() = cache.fold(arrayListOf<Command>()) { acc, e ->
-        acc[e.key] = e.value
-        acc
-    }
+    override fun lastIndex(): Int? = if (nextIndex.get() == 0) null else nextIndex.get() - 1
+
+    override fun isEmpty(): Boolean = lastIndex() == null
+
+    override fun get(i: Int): Command? = if (diskStore.containsKey(i)) diskStore[i] else null
+
+    override fun last(): Command? = if (isEmpty()) null else get(lastIndex()!!)
 
     override fun close() {
         if (cacheManager.status != Status.UNINITIALIZED) {
@@ -67,7 +75,7 @@ class LogDiskEhCache(filePath: String) : Log {
     }
 
     class CommandSerializer(cl: ClassLoader) : Serializer<Command> {
-        constructor(cl: ClassLoader, fbpc: FileBasedPersistenceContext) : this(cl)
+        //constructor(cl: ClassLoader, fbpc: FileBasedPersistenceContext) : this(cl)
 
         override fun equals(obj: Command?, binary: ByteBuffer?): Boolean = obj == read(binary)
 

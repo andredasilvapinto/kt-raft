@@ -4,6 +4,8 @@ import com.natpryce.konfig.CommandLineOption
 import com.natpryce.konfig.ConfigurationProperties
 import com.natpryce.konfig.overriding
 import com.natpryce.konfig.parseArgs
+import me.andresp.cluster.Cluster
+import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
 import me.andresp.config.config
 import me.andresp.data.*
@@ -35,24 +37,25 @@ fun main(args: Array<String>) {
 
     logger.info("$httpPort, $numberOfNodes, $logPath, $target")
 
-    logger.info("Creating new log at: $logPath")
-    File(logPath).deleteRecursively()
+    logger.info("Log path: $logPath")
+    // TODO If log persistence broken then break
 
     val log = LogDiskEhCache(logPath)
     val state = InMemoryConsolidatedState()
 
     val cmdProcessor = CommandProcessor(log, state)
-    cmdProcessor.apply(newSet("A", "3"))
-    cmdProcessor.apply(newSet("B", "5"))
-    cmdProcessor.apply(newDelete("A"))
+    cmdProcessor.init()
 
-    state.log()
-    log.log()
+    logger.info("State: $state")
+    logger.info("Log: $log")
 
     val selfAddress = NodeAddress(LOCAL_IP, cfg[config.httpPort])
+    val cluster = Cluster(cfg[config.numberNodes])
+    val node = Node(selfAddress, cluster)
+
     val nodeClient = NodeClient.defaultClient(selfAddress)
-    val stateMachine = StateMachine.construct(cfg, nodeClient, selfAddress)
-    val server = startServer(httpPort, stateMachine, cmdProcessor, state)
+    val stateMachine = StateMachine.construct(node, nodeClient, cmdProcessor)
+    val server = startServer(httpPort, stateMachine, state, node)
 
     try {
         server.start(wait = false)

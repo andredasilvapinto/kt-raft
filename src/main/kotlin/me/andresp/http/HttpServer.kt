@@ -22,20 +22,23 @@ import me.andresp.api.AppendEntriesReply
 import me.andresp.api.AskVotePayload
 import me.andresp.api.ClientRedirect
 import me.andresp.api.NodeJoinedPayload
-import me.andresp.data.CommandProcessor
+import me.andresp.cluster.Node
 import me.andresp.data.ConsolidatedReadOnlyState
 import me.andresp.data.newDelete
 import me.andresp.data.newSet
-import me.andresp.statemachine.LeaderHeartbeat
-import me.andresp.statemachine.NodeJoinedRequest
+import me.andresp.statemachine.*
 import me.andresp.statemachine.StateId.LEADER
-import me.andresp.statemachine.StateMachine
-import me.andresp.statemachine.VoteRequested
 
 data class Item(val key: String, val value: String)
 data class ItemValue(val value: String)
 
-fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: CommandProcessor, stateConsolidated: ConsolidatedReadOnlyState): ApplicationEngine {
+const val ENDPOINT_CLUSTER_JOIN = "/cluster/join"
+const val ENDPOINT_CLUSTER_ASK_VOTE = "/cluster/ask-vote/{term}"
+const val ENDPOINT_CLUSTER_HEARTBEAT = "/cluster/heartbeat"
+const val ENDPOINT_LOG_APPEND = "/log/append"
+const val ENDPOINT_KEY = "/data/{key}"
+
+fun startServer(httpPort: Int, stateMachine: StateMachine, stateConsolidated: ConsolidatedReadOnlyState, node: Node): ApplicationEngine {
     return embeddedServer(Netty, httpPort) {
         val logger = environment.log
         install(DefaultHeaders)
@@ -47,7 +50,7 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
             }
         }
         routing {
-            put("/cluster/join") { _ ->
+            put(ENDPOINT_CLUSTER_JOIN) { _ ->
                 val nodeJoinedPayload = call.receive<NodeJoinedPayload>()
                 logger.info("Received join request $nodeJoinedPayload")
                 val nodeJoinedRequest = NodeJoinedRequest(nodeJoinedPayload) {
@@ -55,7 +58,7 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 }
                 stateMachine.handle(nodeJoinedRequest)
             }
-            put("/cluster/ask-vote/{term}") { _ ->
+            put(ENDPOINT_CLUSTER_ASK_VOTE) { _ ->
                 val askVotePayload = call.receive<AskVotePayload>()
                 logger.info("Received vote request $askVotePayload")
                 val voteRequested = VoteRequested(askVotePayload) {
@@ -63,21 +66,22 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                 }
                 stateMachine.handle(voteRequested)
             }
-//            post("/cluster/vote/{term}") {
-//                val electionTerm: Int = call.parameters["term"]!!.toInt()
-//                val leaderAddress = call.receive<NodeAddress>()
-//                logger.info("Received vote from $leaderAddress")
-//                val voteReceived = VoteReceived(electionTerm, leaderAddress)
-//                stateMachine.handle(voteReceived)
-//            }
-            put("/cluster/heartbeat") {
+            put(ENDPOINT_CLUSTER_HEARTBEAT) {
                 val leaderHeartbeat = call.receive<LeaderHeartbeat>()
                 logger.info("Received heartbeat $leaderHeartbeat")
                 stateMachine.handle(leaderHeartbeat)
                 // TODO: Implement a better way to handle RPC replies (maybe multiple return on handle()?). Hardcoded replies for now.
                 call.respond(HttpStatusCode.OK, AppendEntriesReply(stateMachine.node.currentElectionTerm.number, true, 0))
             }
-            get("/data/{key}") {
+            post(ENDPOINT_LOG_APPEND) { _ ->
+                val appendEntry = call.receive<AppendEntries>()
+                logger.info("Received AppendEntries $appendEntry")
+                val appendEntryWrapper = AppendEntriesWrapper(appendEntry) {
+                    runBlocking { call.respond(HttpStatusCode.OK, it) }
+                }
+                stateMachine.handle(appendEntryWrapper)
+            }
+            get(ENDPOINT_KEY) {
                 val key = call.parameters["key"]!!
                 val value = stateConsolidated.get(key)
                 if (value == null) {
@@ -86,20 +90,20 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, cmdProcessor: Command
                     call.respond(Item(key, value))
                 }
             }
-            post("/data/{key}") {
+            post(ENDPOINT_KEY) {
                 leaderFilter(stateMachine) {
                     val key = call.parameters["key"]!!
                     val itemValue = call.receive<ItemValue>()
-                    cmdProcessor.apply(newSet(key, itemValue.value))
-                    stateConsolidated.log()
+                    stateMachine.handle(newSet(node.currentElectionTerm.number, key, itemValue.value))
+                    logger.info("State: $stateConsolidated")
                     call.respond(HttpStatusCode.OK)
                 }
             }
-            delete("/data/{key}") {
+            delete(ENDPOINT_KEY) {
                 leaderFilter(stateMachine) {
                     val key = call.parameters["key"]!!
-                    cmdProcessor.apply(newDelete(key))
-                    stateConsolidated.log()
+                    stateMachine.handle(newDelete(node.currentElectionTerm.number, key))
+                    logger.info("State: $stateConsolidated")
                     call.respond(HttpStatusCode.OK)
                 }
             }

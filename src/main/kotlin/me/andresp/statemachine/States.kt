@@ -1,10 +1,17 @@
 package me.andresp.statemachine
 
+import me.andresp.api.AppendEntriesReply
 import me.andresp.cluster.Node
+import me.andresp.data.CommandProcessor
 import me.andresp.http.NodeClient
 
 // State Machine state (don't confuse with State as in data state - that is stored inside node)
-abstract class AState(val stateId: StateId, protected val node: Node, protected val client: NodeClient) {
+abstract class AState(
+        val stateId: StateId,
+        protected val node: Node,
+        protected val client: NodeClient,
+        protected val cmdProcessor: CommandProcessor
+) {
     open fun enter(stateMachine: StateMachine) {}
 
     open fun leave(stateMachine: StateMachine) {}
@@ -24,7 +31,7 @@ abstract class AState(val stateId: StateId, protected val node: Node, protected 
     protected open fun handleNodeJoined(e: NodeJoinedRequest): StateId {
         if (!e.payload.forwarded) {
             client.broadcastAndWait(node.cluster) {
-                client.join(it, e.payload.copy(forwarded = true))
+                client.sendJoinNotification(it, e.payload.copy(forwarded = true))
             }
         }
 
@@ -36,16 +43,32 @@ abstract class AState(val stateId: StateId, protected val node: Node, protected 
     }
 
     protected fun handleVoteRequested(e: VoteRequested): StateId {
-        // TODO: Implement voting logic with log index. Improve thread safety
-        val newerTerm = node.updateTermIfNewer(e.askVotePayload.electionTerm)
-        val sameTerm = e.askVotePayload.electionTerm == node.currentElectionTerm.number
+        // TODO: Improve thread safety ?
+        val askVotePayload = e.askVotePayload
+        val newerTerm = node.updateTermIfNewer(askVotePayload.electionTerm)
+        val sameTerm = askVotePayload.electionTerm == node.currentElectionTerm.number
         val noVoteYet = node.currentElectionTerm.votedFor == null
+        val log = cmdProcessor.log
 
-        val reply = newerTerm || (sameTerm && noVoteYet)
+        val candidateLastLogTerm = askVotePayload.lastLogTerm ?: -1
+        val candidateLastLogIndex = askVotePayload.lastLogIndex ?: -1
+        val myLastLogTerm = log.last()?.termNumber ?: -1
+        val myLastLogIndex = log.lastIndex() ?: -1
+        val recentLog = candidateLastLogTerm >= myLastLogTerm
+                && candidateLastLogIndex >= myLastLogIndex
+
+        val reply = newerTerm || (sameTerm && noVoteYet) && recentLog
 
         e.reply(AskVoteReply(node.currentElectionTerm.number, node.nodeAddress, reply))
 
         return if (reply) StateId.FOLLOWER else stateId
+    }
+
+    protected fun handleAppendEntry(e: AppendEntriesWrapper): StateId {
+        // TODO check leaderCommitIndex, prevLogTermNumber and leaderTerm
+        // TODO update matchIndex
+        e.reply(AppendEntriesReply(node.currentElectionTerm.number, true, 1))
+        return stateId
     }
 }
 

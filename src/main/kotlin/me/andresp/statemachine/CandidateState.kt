@@ -2,14 +2,20 @@ package me.andresp.statemachine
 
 import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
+import me.andresp.api.AskVotePayload
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
+import me.andresp.data.CommandProcessor
 import me.andresp.http.NodeClient
 import me.andresp.statemachine.StateId.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, client) {
+class CandidateState(
+        node: Node,
+        client: NodeClient,
+        cmdProcessor: CommandProcessor
+) : AState(CANDIDATE, node, client, cmdProcessor) {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(CandidateState::class.java)
@@ -33,6 +39,7 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
             is VoteReceived -> handleVoteReceived(e)
             is NodeJoinedRequest -> handleNodeJoined(e)
             is VoteRequested -> handleVoteRequested(e)
+            is AppendEntriesWrapper -> handleAppendEntry(e)
             else -> {
                 logger.info("Candidate doesn't handle ${e.javaClass}. Ignoring.")
                 CANDIDATE
@@ -46,8 +53,15 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
         if (this::candidacy.isInitialized) {
             candidacy.stop()
         }
-        candidacy = Candidacy(node.currentElectionTerm.number, stateMachine, client, node)
+
+        val term = node.currentElectionTerm.number
+        val log = cmdProcessor.log
+        val askVotePayload = AskVotePayload(term, node.nodeAddress, log.lastIndex(), log.last()?.termNumber)
+
+        candidacy = Candidacy(term, stateMachine, client, node, askVotePayload)
+
         candidacy.askForVotes()
+
         return CANDIDATE
     }
 
@@ -72,7 +86,13 @@ class CandidateState(node: Node, client: NodeClient) : AState(CANDIDATE, node, c
             }
 }
 
-private class Candidacy(val term: Int, private val stateMachine: StateMachine, private val client: NodeClient, private val node: Node) {
+private class Candidacy(
+        val term: Int,
+        private val stateMachine: StateMachine,
+        private val client: NodeClient,
+        private val node: Node,
+        private val askVotePayload: AskVotePayload
+) {
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(Candidacy::class.java)
@@ -99,7 +119,7 @@ private class Candidacy(val term: Int, private val stateMachine: StateMachine, p
             while (active) {
                 try {
                     logger.info("Asking $it for a vote")
-                    val reply = client.askForVote(it, node.nodeAddress, term)
+                    val reply = client.sendRequestForVote(it, askVotePayload)
                     if (reply.voteGranted) {
                         stateMachine.handle(VoteReceived(term, reply.voterAddress))
                     }
