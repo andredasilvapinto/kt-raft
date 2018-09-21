@@ -2,6 +2,7 @@
 /.gradle
 /build
 /out
+/log
 
 *.iml
 *.sav

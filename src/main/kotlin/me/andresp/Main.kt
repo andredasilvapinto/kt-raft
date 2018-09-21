@@ -33,7 +33,7 @@ fun main(args: Array<String>) {
         val (tAddress, tPort) = it.split(":")
         NodeAddress(tAddress, tPort.toInt())
     }
-    val logPath = cfg[config.logPath]
+    val logPath = "${cfg[config.logPath]}/$httpPort"
 
     logger.info("$httpPort, $numberOfNodes, $logPath, $target")
 
