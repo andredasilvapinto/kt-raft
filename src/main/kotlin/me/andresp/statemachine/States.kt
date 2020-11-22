@@ -30,7 +30,10 @@ abstract class AState(
 
     protected open fun handleNodeJoined(e: NodeJoinedRequest): StateId {
         if (!e.payload.forwarded) {
-            client.broadcastAndWait(node.cluster) {
+            // TODO nodes should initially be in non-voting state
+            // Do not redirect node joined event to the joining node
+            // (in case it is rejoining a cluster after disconnecting)
+            client.broadcastAndWait(node.cluster.nodeAddresses.minus(e.payload.joinerAddress)) {
                 client.sendJoinNotification(it, e.payload.copy(forwarded = true))
             }
         }
@@ -78,6 +81,7 @@ abstract class AState(
 }
 
 enum class StateId {
+    DISCONNECTED,
     FOLLOWER,
     CANDIDATE,
     LEADER

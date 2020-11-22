@@ -27,36 +27,37 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
 
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(StateMachine::class.java)
-        val ELECTION_TIMEOUT_RANGE_MS = 1500..3000 //150..300
+        val ELECTION_TIMEOUT_RANGE_MS = 15000..30000 // 150..300
 
         fun construct(node: Node, nodeClient: NodeClient, cmdProcessor: CommandProcessor): StateMachine {
             val states = mapOf(
+                    DISCONNECTED to DisconnectedState(node, nodeClient, cmdProcessor),
                     FOLLOWER to FollowerState(node, nodeClient, cmdProcessor),
                     CANDIDATE to CandidateState(node, nodeClient, cmdProcessor),
                     LEADER to LeaderState(node, nodeClient, cmdProcessor)
             )
-            return StateMachine(node, nodeClient, states, states[FOLLOWER]!!)
+            return StateMachine(node, nodeClient, states, states[DISCONNECTED]!!)
         }
     }
 
-    @Synchronized
     fun start(target: NodeAddress?) {
         if (target == null) {
             logger.info("Starting a new cluster")
             node.cluster.addNode(node.nodeAddress)
+            transitionState(LEADER)
         } else {
             runBlocking {
                 logger.info("Joining cluster via $target")
                 try {
                     val clusterStatus = nodeClient.sendJoinNotification(target, NodeJoinedPayload(node.nodeAddress))
                     node.cluster.setStatus(clusterStatus)
+                    transitionState(FOLLOWER)
                 } catch (e: Exception) {
                     logger.error("Error when trying to join the cluster", e)
                     throw e
                 }
             }
         }
-        currentState.enter(this)
     }
 
     fun scheduleElectionTimeout() {
@@ -79,6 +80,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
     @Synchronized
     fun handle(ev: Event) {
         try {
+            logger.info("Handling event $ev")
             val newStateId = currentState.handle(ev, this)
             transitionState(newStateId)
         } catch (e: Exception) {

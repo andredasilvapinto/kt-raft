@@ -54,7 +54,10 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, stateConsolidated: Co
                 val nodeJoinedPayload = call.receive<NodeJoinedPayload>()
                 logger.info("Received join request $nodeJoinedPayload")
                 val nodeJoinedRequest = NodeJoinedRequest(nodeJoinedPayload) {
-                    runBlocking { call.respond(HttpStatusCode.OK, it) }
+                    runBlocking {
+                        call.respond(HttpStatusCode.OK, it)
+                        logger.info("Responded to join request $nodeJoinedPayload with $it")
+                    }
                 }
                 stateMachine.handle(nodeJoinedRequest)
             }

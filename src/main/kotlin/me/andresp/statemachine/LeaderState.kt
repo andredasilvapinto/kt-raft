@@ -20,7 +20,7 @@ class LeaderState(
 
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(LeaderState::class.java)
-        private const val LEADER_HEARTBEAT_PERIOD_MS = 500L
+        private const val LEADER_HEARTBEAT_PERIOD_MS = 10000L // 500L
     }
 
     private val timer = Timer(true)

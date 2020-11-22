@@ -37,10 +37,6 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
                         setMaxConnPerRoute(100)
                     }
                 }) { install(JsonFeature) })
-
-        fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.map { GlobalScope.launch { f(it) } }
-
-        fun broadcastAndWait(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = runBlocking { nodeAddresses.map { async { f(it) } }.awaitAll() }
     }
 
     suspend fun sendJoinNotification(targetAddress: NodeAddress, nodeJoinedPayload: NodeJoinedPayload): ClusterStatus =
@@ -71,8 +67,12 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
         return response
     }
 
-    fun broadcast(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcast(cluster.nodeAddresses.minus(selfAddress), f)
+    fun broadcast(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcast(cluster.nodeAddresses, f)
 
-    fun broadcastAndWait(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcastAndWait(cluster.nodeAddresses.minus(selfAddress), f)
+    fun broadcastAndWait(cluster: Cluster, f: suspend (NodeAddress) -> Unit) = broadcastAndWait(cluster.nodeAddresses, f)
+
+    fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.minus(selfAddress).map { GlobalScope.launch { f(it) } }
+
+    fun broadcastAndWait(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = runBlocking { nodeAddresses.minus(selfAddress).map { async { f(it) } }.awaitAll() }
 }
 

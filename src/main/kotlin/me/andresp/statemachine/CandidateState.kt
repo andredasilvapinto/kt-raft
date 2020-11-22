@@ -19,7 +19,7 @@ class CandidateState(
 ) : AState(CANDIDATE, node, client, cmdProcessor) {
 
     companion object {
-        val logger: Logger = LoggerFactory.getLogger(CandidateState::class.java)
+        val logger: Logger = LoggerFactory.getLogger(DisconnectedState::class.java)
     }
 
     @Volatile
@@ -97,7 +97,7 @@ private class Candidacy(
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(Candidacy::class.java)
-        const val VOTE_REQUEST_TIMEOUT_MS = 500L
+        const val VOTE_REQUEST_TIMEOUT_MS = 50000L // 500L
     }
 
     private val receivedVotes = mutableSetOf<NodeAddress>()
