@@ -7,10 +7,7 @@ import io.ktor.client.request.request
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.awaitAll
-import kotlinx.coroutines.experimental.launch
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.*
 import me.andresp.api.AppendEntriesReply
 import me.andresp.api.AskVotePayload
 import me.andresp.api.NodeJoinedPayload
@@ -41,7 +38,7 @@ class NodeClient(private val selfAddress: NodeAddress, private val httpClient: H
                     }
                 }) { install(JsonFeature) })
 
-        fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.map { launch { f(it) } }
+        fun broadcast(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = nodeAddresses.map { GlobalScope.launch { f(it) } }
 
         fun broadcastAndWait(nodeAddresses: Set<NodeAddress>, f: suspend (NodeAddress) -> Unit) = runBlocking { nodeAddresses.map { async { f(it) } }.awaitAll() }
     }

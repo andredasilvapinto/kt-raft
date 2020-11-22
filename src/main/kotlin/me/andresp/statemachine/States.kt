@@ -61,7 +61,12 @@ abstract class AState(
 
         e.reply(AskVoteReply(node.currentElectionTerm.number, node.nodeAddress, reply))
 
-        return if (reply) StateId.FOLLOWER else stateId
+        return if (reply) {
+            node.currentElectionTerm.votedFor = askVotePayload.candidateAddress
+            StateId.FOLLOWER
+        } else {
+            stateId
+        }
     }
 
     protected fun handleAppendEntry(e: AppendEntriesWrapper): StateId {

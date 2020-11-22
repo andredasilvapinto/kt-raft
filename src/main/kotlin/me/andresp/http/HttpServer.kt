@@ -10,14 +10,14 @@ import io.ktor.features.ContentNegotiation
 import io.ktor.features.DefaultHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.jackson.jackson
-import io.ktor.pipeline.PipelineContext
 import io.ktor.request.receive
 import io.ktor.response.respond
 import io.ktor.routing.*
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import kotlinx.coroutines.experimental.runBlocking
+import io.ktor.util.pipeline.PipelineContext
+import kotlinx.coroutines.runBlocking
 import me.andresp.api.AppendEntriesReply
 import me.andresp.api.AskVotePayload
 import me.andresp.api.ClientRedirect
@@ -33,7 +33,7 @@ data class Item(val key: String, val value: String)
 data class ItemValue(val value: String)
 
 const val ENDPOINT_CLUSTER_JOIN = "/cluster/join"
-const val ENDPOINT_CLUSTER_ASK_VOTE = "/cluster/ask-vote/{term}"
+const val ENDPOINT_CLUSTER_ASK_VOTE = "/cluster/ask-vote"
 const val ENDPOINT_CLUSTER_HEARTBEAT = "/cluster/heartbeat"
 const val ENDPOINT_LOG_APPEND = "/log/append"
 const val ENDPOINT_KEY = "/data/{key}"
@@ -58,7 +58,7 @@ fun startServer(httpPort: Int, stateMachine: StateMachine, stateConsolidated: Co
                 }
                 stateMachine.handle(nodeJoinedRequest)
             }
-            put(ENDPOINT_CLUSTER_ASK_VOTE) { _ ->
+            put("$ENDPOINT_CLUSTER_ASK_VOTE/{term}") { _ ->
                 val askVotePayload = call.receive<AskVotePayload>()
                 logger.info("Received vote request $askVotePayload")
                 val voteRequested = VoteRequested(askVotePayload) {
@@ -115,6 +115,6 @@ suspend fun PipelineContext<*, ApplicationCall>.leaderFilter(stateMachine: State
     if (stateMachine.currentState.stateId == LEADER) {
         f()
     } else {
-        call.respond(HttpStatusCode.TemporaryRedirect, ClientRedirect(stateMachine.node.cluster.leader))
+        call.respond(HttpStatusCode.TemporaryRedirect, ClientRedirect(stateMachine.node.currentElectionTerm.leaderAddress))
     }
 }

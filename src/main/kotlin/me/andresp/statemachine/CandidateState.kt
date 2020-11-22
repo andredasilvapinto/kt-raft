@@ -1,7 +1,8 @@
 package me.andresp.statemachine
 
-import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import me.andresp.api.AskVotePayload
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
@@ -96,7 +97,7 @@ private class Candidacy(
 
     companion object {
         val logger: Logger = LoggerFactory.getLogger(Candidacy::class.java)
-        const val VOTE_REQUEST_TIMEOUT_MS = 500
+        const val VOTE_REQUEST_TIMEOUT_MS = 500L
     }
 
     private val receivedVotes = mutableSetOf<NodeAddress>()
@@ -108,7 +109,7 @@ private class Candidacy(
         get() = receivedVotes.size
 
     fun askForVotes() {
-        launch {
+        GlobalScope.launch {
             // Vote for itself
             // needs to be done in a different coroutine so the synchronized handle
             // blocks this from running before the current event is completely processed

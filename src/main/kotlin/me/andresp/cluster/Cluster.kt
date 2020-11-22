@@ -1,17 +1,9 @@
 package me.andresp.cluster
 
 class Cluster(val totalNumberOfNodes: Int) {
-    var leader: NodeAddress? = null
-        private set
     @Volatile
     var nodeAddresses = mutableSetOf<NodeAddress>()
         private set
-
-    @Synchronized
-    fun updateLeader(newLeader: NodeAddress) {
-        // TODO Improve + persist
-        this.leader = newLeader
-    }
 
     fun addNode(newNode: NodeAddress) = nodeAddresses.add(newNode)
 

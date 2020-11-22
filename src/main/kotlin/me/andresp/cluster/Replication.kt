@@ -1,9 +1,10 @@
 package me.andresp.cluster
 
-import kotlinx.coroutines.experimental.Deferred
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.channels.Channel
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 
 
 fun replicate(node: Node, f: suspend (NodeAddress) -> Boolean): Deferred<Boolean> {
@@ -12,12 +13,12 @@ fun replicate(node: Node, f: suspend (NodeAddress) -> Boolean): Deferred<Boolean
     val others = clusterNodes.minus(node.nodeAddress)
 
     others.map {
-        launch {
+        GlobalScope.launch {
             channel.send(f(it))
         }
     }
 
-    return async {
+    return GlobalScope.async {
         var nSuccess = 1  // self
         val majority = clusterNodes.size / 2 + 1
         repeat(others.size) {

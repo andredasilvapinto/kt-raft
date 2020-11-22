@@ -19,7 +19,7 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
             if (File(termFilePath).exists()) {
                 Term.load(termFilePath)
             } else {
-                Term(0, null)
+                Term(0, null, null)
             }
     )
 
@@ -28,7 +28,7 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
 
     @Synchronized
     fun newTerm() {
-        setCurrentElectionTerm(currentElectionTermRef.get().number + 1)
+        setCurrentElectionTerm(currentElectionTermRef.get().number + 1, null)
     }
 
     // TODO: Still need synchronized because of atomic change of leader and term (perhaps move leader inside Term?)
@@ -36,20 +36,15 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
     fun handleNewLeaderTerm(newLeader: NodeAddress, newLeaderElectionTerm: Int) {
         if (newLeaderElectionTerm < currentElectionTerm.number) {
             throw IllegalArgumentException("Trying to set older leader $newLeader from term $newLeaderElectionTerm when we are already in term $currentElectionTermRef")
-        } else {
-            if (newLeader != cluster.leader) {
-                cluster.updateLeader(newLeader)
-                logger.info("Changed leader to $newLeader")
-            }
-            if (newLeaderElectionTerm > currentElectionTerm.number) {
-                setCurrentElectionTerm(newLeaderElectionTerm)
-            }
+        } else if (newLeader != currentElectionTerm.leaderAddress || newLeaderElectionTerm > currentElectionTerm.number) {
+            setCurrentElectionTerm(newLeaderElectionTerm, newLeader)
+            logger.info("Changed term to $currentElectionTerm")
         }
     }
 
     @Synchronized
-    fun setCurrentElectionTerm(electionTerm: Int) {
-        currentElectionTermRef.set(Term(electionTerm, null))
+    fun setCurrentElectionTerm(electionTerm: Int, leaderAddress: NodeAddress?) {
+        currentElectionTermRef.set(Term(electionTerm, leaderAddress, null))
         currentElectionTerm.save(termFilePath)
         logger.info("Changed current election term to $currentElectionTerm")
     }
@@ -60,7 +55,7 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
                 // TODO: Who is the leader now?
                 logger.info("Changed current election term to $electionTerm")
                 currentElectionTerm.save(termFilePath)
-                Term(electionTerm, null)
+                Term(electionTerm, null, null)
             } else {
                 it
             }
@@ -69,10 +64,10 @@ class Node(val nodeAddress: NodeAddress, val cluster: Cluster) {
     }
 }
 
-data class NodeAddress(val host: String, val port: Int)
+data class NodeAddress(val host: String, val port: Int) : Serializable
 
 
-data class Term(val number: Int, @Volatile var votedFor: NodeAddress?) : Serializable {
+data class Term(val number: Int, @Volatile var leaderAddress: NodeAddress?, @Volatile var votedFor: NodeAddress?) : Serializable {
     fun save(filePath: String) {
         ObjectOutputStream(FileOutputStream(filePath)).use { it.writeObject(this) }
     }

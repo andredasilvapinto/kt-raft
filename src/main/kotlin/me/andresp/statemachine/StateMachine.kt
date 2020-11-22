@@ -1,7 +1,8 @@
 package me.andresp.statemachine
 
-import kotlinx.coroutines.experimental.launch
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import me.andresp.api.NodeJoinedPayload
 import me.andresp.cluster.Node
 import me.andresp.cluster.NodeAddress
@@ -63,7 +64,7 @@ class StateMachine(val node: Node, private val nodeClient: NodeClient, private v
         val delayMs = ELECTION_TIMEOUT_RANGE_MS.random().toLong()
         timerTask = timer.schedule(delayMs) {
             logger.info("Election timeout $delayMs ms reached. Injecting timeout event.")
-            launch {
+            GlobalScope.launch {
                 handle(ElectionTimeout(node.currentElectionTerm.number))
             }
         }

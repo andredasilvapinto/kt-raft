@@ -1,7 +1,11 @@
 package me.andresp.data
 
-import io.ktor.util.moveToByteArray
-import kotlinx.serialization.cbor.CBOR
+import kotlinx.serialization.cbor.Cbor
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.decodeFromByteArray
+//import kotlinx.serialization.decodeFromString
+//import kotlinx.serialization.encodeToString
+//import kotlinx.serialization.json.Json
 import org.ehcache.Cache
 import org.ehcache.PersistentCacheManager
 import org.ehcache.Status
@@ -14,6 +18,7 @@ import org.ehcache.spi.serialization.Serializer
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.ByteBuffer
+//import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 
 
@@ -79,8 +84,17 @@ class LogDiskEhCache(filePath: String) : Log {
 
         override fun equals(obj: Command?, binary: ByteBuffer?): Boolean = obj == read(binary)
 
-        override fun serialize(obj: Command?): ByteBuffer = ByteBuffer.wrap(CBOR.dump(obj!!))
+        override fun serialize(obj: Command?): ByteBuffer = ByteBuffer.wrap(Cbor.encodeToByteArray(obj!!))
+        //override fun serialize(obj: Command?): ByteBuffer = ByteBuffer.wrap(Json.encodeToString(obj!!).toByteArray(StandardCharsets.UTF_8))
 
-        override fun read(binary: ByteBuffer?): Command = CBOR.load(binary!!.moveToByteArray())
+        override fun read(binary: ByteBuffer?): Command = Cbor.decodeFromByteArray(toByteArray(binary!!))
+        //override fun read(binary: ByteBuffer?): Command = Json.decodeFromString(String(binary!!.array(), StandardCharsets.UTF_8))
+        //override fun read(binary: ByteBuffer?): Command = Json.decodeFromString(StandardCharsets.UTF_8.decode(binary!!).toString())
+
+        private fun toByteArray(buf: ByteBuffer): ByteArray {
+            val arr = ByteArray(buf.remaining())
+            buf.get(arr)
+            return arr
+        }
     }
 }

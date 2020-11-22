@@ -1,6 +1,6 @@
 package me.andresp.statemachine
 
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.runBlocking
 import me.andresp.cluster.Node
 import me.andresp.cluster.replicate
 import me.andresp.data.Command
